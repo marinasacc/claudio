@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+      background: #f0f2f5; min-height: 100vh; padding: 12px;
+    }
+    .container {
+      background: white; border-radius: 16px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+      padding: 24px; max-width: 860px; margin: 0 auto;
+    }
+    .header { text-align: center; margin-bottom: 24px; }
+    .header h1 { color: #1a1a1a; font-size: 20px; margin-bottom: 4px; }
+    .header p { color: #888; font-size: 13px; }
+
+    /* ── Progress ── */
+    .progress-bar { display: flex; margin-bottom: 28px; }
+    .step-item { flex: 1; text-align: center; position: relative; }
+    .step-item:not(:last-child)::after {
+      content: ''; position: absolute;
+      top: 13px; left: 55%; width: 90%; height: 2px; background: #ddd; z-index: 0;
+    }
+    .step-item.done:not(:last-child)::after { background: #2e7d32; }
+    .step-circle {
+      width: 26px; height: 26px; border-radius: 50%;
+      background: #ddd; color: #999; font-size: 12px; font-weight: 700;
+      display: inline-flex; align-items: center; justify-content: center;
+      position: relative; z-index: 1; transition: all 0.3s;
+    }
+    .step-item.active .step-circle { background: #1976d2; color: white; }
+    .step-item.done .step-circle { background: #2e7d32; color: white; }
+    .step-label { font-size: 11px; color: #bbb; margin-top: 4px; }
+    .step-item.active .step-label { color: #1976d2; font-weight: 600; }
+    .step-item.done .step-label { color: #2e7d32; }
+
+    /* ── Pasos ── */
+    .paso { display: none; }
+    .paso.active { display: block; }
+    .paso-titulo {
+      font-size: 16px; font-weight: 700; color: #1a1a1a;
+      margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0;
+    }
+
+    /* ── Botones ── */
+    .btn {
+      padding: 10px 20px; border-radius: 10px; border: none;
+      cursor: pointer; font-size: 14px; font-weight: 600;
+      transition: all 0.2s; display: inline-block;
+    }
+    .btn-primary { background: #1976d2; color: white; }
+    .btn-primary:hover:not(:disabled) { background: #1565c0; }
+    .btn-secondary { background: #f5f5f5; color: #555; }
+    .btn-secondary:hover:not(:disabled) { background: #e0e0e0; }
+    .btn-success { background: #2e7d32; color: white; font-size: 15px; padding: 13px 32px; }
+    .btn-success:hover:not(:disabled) { background: #1b5e20; }
+    .btn-sm { padding: 6px 14px; font-size: 13px; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-link { background: none; border: none; color: #1976d2; cursor: pointer; font-size: 12px; padding: 0; }
+    .nav-buttons {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 20px; padding-top: 16px; border-top: 1px solid #f0f0f0;
+    }
+
+    /* ── Buscador ── */
+    .search-box { display: flex; gap: 10px; margin-bottom: 16px; }
+    .search-box input {
+      flex: 1; padding: 10px 14px;
+      border: 1px solid #ddd; border-radius: 10px; font-size: 14px;
+    }
+    .search-box input:focus { outline: none; border-color: #1976d2; box-shadow: 0 0 0 3px rgba(25,118,210,0.1); }
+
+    /* ── Lista productos ── */
+    .producto-item {
+      display: flex; align-items: center; gap: 14px;
+      padding: 12px; border: 1px solid #e8e8e8; border-radius: 10px;
+      margin-bottom: 8px; cursor: pointer; transition: all 0.2s;
+    }
+    .producto-item:hover { border-color: #1976d2; background: #f8f9ff; }
+    .producto-item.selected { border-color: #1976d2; background: #e3f2fd; }
+    .producto-img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; background: #f5f5f5; flex-shrink: 0; }
+    .producto-img-ph {
+      width: 56px; height: 56px; border-radius: 8px; background: #eee;
+      display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;
+    }
+    .producto-info { flex: 1; min-width: 0; }
+    .producto-nombre { font-size: 14px; font-weight: 600; color: #1a1a1a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .producto-meta { font-size: 12px; color: #888; margin-top: 2px; }
+    .producto-precio { font-size: 14px; font-weight: 700; color: #2e7d32; flex-shrink: 0; }
+
+    /* ── Mini card ── */
+    .mini-card {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 14px; background: #e3f2fd; border-radius: 10px; margin-bottom: 16px;
+    }
+    .mini-card img { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; }
+    .mini-card .info { flex: 1; }
+    .mini-card .nombre { font-weight: 600; font-size: 14px; }
+    .mini-card .meta { font-size: 12px; color: #555; }
+
+    /* ── Árbol de categorías ── */
+    .cat-breadcrumb {
+      display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
+      background: #f8f9fa; border-radius: 8px; padding: 8px 12px;
+      margin-bottom: 12px; font-size: 13px;
+    }
+    .bc-item {
+      color: #1976d2; cursor: pointer; font-weight: 600;
+      padding: 2px 6px; border-radius: 4px;
+    }
+    .bc-item:hover { background: #e3f2fd; }
+    .bc-sep { color: #bbb; font-size: 11px; }
+    .bc-current { color: #555; font-weight: 700; cursor: default; padding: 2px 6px; }
+
+    .usar-cat-banner {
+      display: flex; align-items: center; justify-content: space-between;
+      background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px;
+      padding: 10px 14px; margin-bottom: 12px; font-size: 14px;
+    }
+    .usar-cat-banner .nombre { font-weight: 600; color: #555; }
+    .usar-cat-banner .hint { font-size: 12px; color: #888; }
+
+    /* Grid de categorías */
+    .cat-grid { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+    .cat-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 11px 14px; border: 1px solid #e8e8e8; border-radius: 10px;
+      cursor: pointer; transition: all 0.2s; background: white;
+    }
+    .cat-item:hover { border-color: #1976d2; background: #f8f9ff; }
+    .cat-item.oculto { display: none; }
+    .cat-item-left { flex: 1; }
+    .cat-item-nombre { font-size: 14px; font-weight: 600; color: #1a1a1a; }
+    .cat-item-meta { font-size: 12px; color: #888; margin-top: 2px; }
+    .cat-item-arrow { color: #bbb; font-size: 16px; flex-shrink: 0; margin-left: 10px; }
+
+    /* Categoría seleccionada (banner) */
+    .cat-sel-banner {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 10px;
+      padding: 12px 16px; margin-top: 12px; font-size: 14px;
+    }
+    .cat-sel-banner strong { color: #1b5e20; }
+
+    /* Resultados búsqueda API */
+    .sec-busqueda {
+      border: 1px solid #e3f2fd; border-radius: 10px;
+      padding: 12px 14px; margin-bottom: 12px; background: #f8fbff;
+    }
+    .sec-busqueda-titulo {
+      font-size: 12px; font-weight: 700; color: #1976d2;
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;
+    }
+
+    /* ── Secciones formulario ── */
+    .section-title {
+      font-size: 13px; font-weight: 700; color: #555; text-transform: uppercase;
+      letter-spacing: 0.5px; margin: 20px 0 12px;
+      padding-bottom: 8px; border-bottom: 1px solid #f0f0f0;
+    }
+    .attr-grupo { margin-bottom: 14px; }
+    .attr-label { font-size: 13px; font-weight: 600; color: #333; display: block; margin-bottom: 5px; }
+    .attr-label .req { color: #c62828; margin-left: 2px; }
+    .attr-input, .attr-select {
+      width: 100%; padding: 9px 12px;
+      border: 1px solid #ddd; border-radius: 8px; font-size: 14px;
+    }
+    .attr-input:focus, .attr-select:focus { outline: none; border-color: #1976d2; }
+
+    .titulo-edit { width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 10px; font-size: 15px; }
+    .titulo-edit:focus { outline: none; border-color: #1976d2; }
+    .titulo-hint { font-size: 12px; color: #888; margin-top: 4px; margin-bottom: 14px; }
+    #contadorTitulo { font-weight: 600; }
+
+    /* ── Variantes ── */
+    .dim-block { border: 1px solid #e8e8e8; border-radius: 10px; padding: 14px; margin-bottom: 14px; }
+    .dim-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+    .dim-nombre { font-weight: 700; font-size: 14px; min-width: 80px; }
+    .dim-arrow { color: #bbb; }
+    .dim-select { flex: 1; min-width: 180px; padding: 7px 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; }
+    .val-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .val-table th { text-align: left; padding: 7px 10px; background: #f8f9fa; color: #555; font-weight: 600; border-bottom: 1px solid #e8e8e8; }
+    .val-table td { padding: 6px 10px; border-bottom: 1px solid #f5f5f5; }
+    .val-table .tn-val { color: #555; }
+
+    /* ── Precio / stock ── */
+    .precio-stock-row { display: flex; gap: 14px; }
+    .precio-stock-row .attr-grupo { flex: 1; }
+
+    /* ── Flex toggle ── */
+    .flex-box {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 12px 14px; background: #f8f9fa; border-radius: 10px; margin-bottom: 4px;
+    }
+    .flex-box input[type="checkbox"] { width: 18px; height: 18px; margin-top: 2px; cursor: pointer; }
+    .flex-box label { font-size: 14px; font-weight: 600; cursor: pointer; }
+    .flex-desc { font-size: 12px; color: #888; margin-top: 2px; }
+
+    /* ── Resumen ── */
+    .resumen-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 10px 0; border-bottom: 1px solid #f5f5f5; font-size: 14px;
+    }
+    .resumen-row .lbl { color: #888; }
+    .resumen-row .val { font-weight: 600; color: #1a1a1a; text-align: right; max-width: 60%; }
+    .resumen-img { text-align: center; margin-bottom: 16px; }
+    .resumen-img img { width: 100px; height: 100px; object-fit: cover; border-radius: 10px; }
+
+    /* ── Mensajes ── */
+    .loading { text-align: center; padding: 32px; color: #888; font-size: 13px; }
+    .spinner {
+      display: inline-block; width: 28px; height: 28px;
+      border: 3px solid #ddd; border-top-color: #1976d2;
+      border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .msg-error { background: #ffebee; color: #c62828; padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 13px; }
+    .msg-info { background: #e3f2fd; color: #0d47a1; padding: 9px 13px; border-radius: 8px; margin-bottom: 12px; font-size: 13px; }
+    .msg-success { background: #e8f5e9; padding: 20px 24px; border-radius: 12px; }
+    .msg-success h3 { font-size: 18px; color: #1b5e20; margin-bottom: 8px; }
+    .msg-success p { font-size: 14px; color: #333; margin-top: 6px; }
+    .btn-meli { background: #ffe600; color: #333; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 14px; display: inline-block; margin-top: 12px; }
+    .btn-meli:hover { background: #ffd600; }
+    .empty-state { text-align: center; padding: 32px; color: #bbb; font-size: 13px; }
+    .breadcrumb { font-size: 12px; color: #888; margin-bottom: 16px; }
+
+    /* ── Catálogo ── */
+    .catalog-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 12px; border: 1px solid #e8e8e8; border-radius: 10px;
+      margin-bottom: 6px; cursor: pointer; transition: all 0.2s; background: white;
+    }
+    .catalog-item:hover { border-color: #1976d2; background: #f8f9ff; }
+    .catalog-item img { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; flex-shrink: 0; background: #eee; }
+    .catalog-item .ci-ph { width: 48px; height: 48px; border-radius: 6px; background: #eee; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+    .catalog-item .ci-info { flex: 1; min-width: 0; }
+    .catalog-item .ci-nombre { font-size: 13px; font-weight: 600; color: #1a1a1a; }
+    .catalog-item .ci-attrs { font-size: 12px; color: #888; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .catalog-item .ci-id { font-size: 11px; color: #bbb; flex-shrink: 0; }
+    .catalog-sel {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 10px;
+      padding: 10px 14px; margin-bottom: 12px; font-size: 13px;
+    }
+    .catalog-sel strong { color: #1b5e20; flex: 1; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>📦 Publicar en MercadoLibre</h1>
+    <p>Publicá un producto de TiendaNube directamente en MercadoLibre</p>
+  </div>
+
+  <div class="progress-bar">
+    <div class="step-item active" id="si1"><div class="step-circle">1</div><div class="step-label">Producto</div></div>
+    <div class="step-item" id="si2"><div class="step-circle">2</div><div class="step-label">Categoría</div></div>
+    <div class="step-item" id="si3"><div class="step-circle">3</div><div class="step-label">Detalles</div></div>
+    <div class="step-item" id="si4"><div class="step-circle">4</div><div class="step-label">Publicar</div></div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       PASO 1 — Producto TN
+  ══════════════════════════════════════════ -->
+  <div id="paso1" class="paso active">
+    <div class="paso-titulo">Seleccioná el producto de TiendaNube</div>
+    <div class="search-box">
+      <input type="text" id="buscadorTN"
+             placeholder="Nombre del producto (ej: sabana, almohada, toalla...)"
+             onkeydown="if(event.key==='Enter') buscarProductos()">
+      <button class="btn btn-primary" onclick="buscarProductos()">Buscar</button>
+    </div>
+    <div id="resTN"><div class="empty-state">Escribí el nombre y presioná Buscar</div></div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       PASO 2 — Categoría MeLi (árbol + búsqueda)
+  ══════════════════════════════════════════ -->
+  <div id="paso2" class="paso">
+    <div class="paso-titulo">Elegí la categoría en MercadoLibre</div>
+
+    <!-- Mini card producto seleccionado -->
+    <div id="miniCard" class="mini-card" style="display:none">
+      <img id="mcImg" src="" onerror="this.style.display='none'">
+      <div class="info">
+        <div class="nombre" id="mcNombre"></div>
+        <div class="meta" id="mcMeta"></div>
+      </div>
+      <button class="btn-link" onclick="irPaso(1)">Cambiar</button>
+    </div>
+
+    <!-- Buscador + filtro -->
+    <div class="search-box">
+      <input type="text" id="buscadorCat"
+             placeholder="Filtrar o buscar categoría (ej: sábanas, toallas...)"
+             oninput="filtrarCatsVisible()"
+             onkeydown="if(event.key==='Enter') buscarCatsAPI()">
+      <button class="btn btn-primary" onclick="buscarCatsAPI()">Buscar</button>
+    </div>
+
+    <!-- Resultados de búsqueda API (aparecen solo al buscar) -->
+    <div id="secApiCats" style="display:none">
+      <div class="sec-busqueda">
+        <div class="sec-busqueda-titulo">Resultados de búsqueda</div>
+        <div id="listaApiCats"></div>
+      </div>
+      <button class="btn-link" onclick="cerrarBusqueda()" style="margin-bottom:14px; font-size:13px;">
+        ✕ Cerrar y volver al árbol
+      </button>
+    </div>
+
+    <!-- Árbol de categorías -->
+    <div id="arbolCats">
+      <!-- Breadcrumb de navegación -->
+      <div id="bcCat" style="display:none">
+        <div class="cat-breadcrumb" id="bcCatInner"></div>
+      </div>
+
+      <!-- Banner "Usar esta categoría" (para niveles intermedios) -->
+      <div id="usarActualBanner" style="display:none">
+        <div class="usar-cat-banner">
+          <div>
+            <div class="nombre" id="usarActualNombre"></div>
+            <div class="hint">Publicar en este nivel de categoría</div>
+          </div>
+          <button class="btn btn-sm btn-secondary" onclick="seleccionarCatActual()">Usar esta</button>
+        </div>
+      </div>
+
+      <!-- Grid de categorías del nivel actual -->
+      <div id="gridCats">
+        <div class="loading"><div class="spinner"></div><p>Cargando categorías...</p></div>
+      </div>
+    </div>
+
+    <!-- Categoría seleccionada (banner verde) -->
+    <div id="catSelBox" style="display:none">
+      <div class="cat-sel-banner">
+        <span>✅ Seleccionada:</span>
+        <strong id="catSelNombre"></strong>
+        <button class="btn-link" onclick="deseleccionarCat()">Cambiar</button>
+      </div>
+    </div>
+
+    <div class="nav-buttons">
+      <button class="btn btn-secondary" onclick="irPaso(1)">← Volver</button>
+      <button class="btn btn-primary" id="btnCat" onclick="confirmarCat()" disabled>Continuar →</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       PASO 3 — Detalles
+  ══════════════════════════════════════════ -->
+  <div id="paso3" class="paso">
+    <div class="paso-titulo">Detalles de la publicación</div>
+    <div class="breadcrumb" id="bc3"></div>
+
+    <!-- Catálogo MeLi (para categorías controladas por catálogo) -->
+    <div id="secCatalogo">
+      <div class="section-title">Producto del catálogo MeLi <span class="req">*</span></div>
+      <div class="msg-info" style="margin-bottom:10px;font-size:13px;" id="msgCatalogo">
+        Buscá tu producto en el catálogo de MercadoLibre. Si no lo encontrás, usá el botón de abajo para publicar con título libre.
+      </div>
+      <div class="search-box" style="margin-bottom:10px;">
+        <input type="text" id="buscadorCatalog" placeholder="Buscar en catálogo MeLi..."
+               onkeydown="if(event.key==='Enter') buscarCatalog()">
+        <button class="btn btn-primary btn-sm" onclick="buscarCatalog()">Buscar</button>
+      </div>
+      <div id="resCatalog"></div>
+      <div id="catalogSelBox" style="display:none">
+        <div class="catalog-sel">
+          <span>✅ Catálogo:</span>
+          <strong id="catalogSelNombre"></strong>
+          <span style="font-size:11px;color:#888;" id="catalogSelId"></span>
+          <button class="btn-link" onclick="deseleccionarCatalog()">Cambiar</button>
+        </div>
+      </div>
+      <div style="text-align:right;margin-bottom:4px;">
+        <button id="linkSinCatalogo" class="btn-link" style="font-size:12px;color:#888;" onclick="saltarCatalogo()">
+          No está en el catálogo → publicar sin catálogo
+        </button>
+      </div>
+    </div>
+
+    <!-- Título (solo visible si no hay catálogo seleccionado) -->
+    <div id="secTitulo" style="display:none">
+      <div class="attr-grupo">
+        <label class="attr-label" for="tituloMeli">Título <span class="req">*</span></label>
+        <input type="text" id="tituloMeli" class="titulo-edit" maxlength="60" oninput="actualizarContador()">
+        <div class="titulo-hint"><span id="contadorTitulo">0</span>/60 caracteres — evitá mayúsculas y símbolos especiales</div>
+      </div>
+    </div>
+
+    <div id="loadAttrs" class="loading" style="display:none">
+      <div class="spinner"></div><p>Cargando atributos de la categoría...</p>
+    </div>
+
+    <!-- Atributos requeridos -->
+    <div id="secAttrs" style="display:none">
+      <div class="section-title">Atributos requeridos <span style="color:#c62828">*</span></div>
+      <div id="formAttrs"></div>
+    </div>
+
+    <!-- Atributos opcionales -->
+    <div id="secOpcionales" style="display:none">
+      <div class="section-title" style="cursor:pointer;" onclick="toggleOpcionales()">
+        Atributos adicionales <span id="iconOpcionales">▼</span>
+        <span style="font-size:11px;color:#888;font-weight:400;margin-left:6px;">completá todos los que puedas</span>
+      </div>
+      <div id="formOpcionales"></div>
+    </div>
+
+    <!-- Variantes -->
+    <div id="secVariantes" style="display:none">
+      <div class="section-title">Variantes</div>
+      <div class="msg-info" id="varInfo"></div>
+      <div id="formVariantes"></div>
+    </div>
+
+    <!-- Producto simple: precio + stock -->
+    <div id="secSimple" style="display:none">
+      <div class="section-title">Precio y stock</div>
+      <div class="precio-stock-row">
+        <div class="attr-grupo">
+          <label class="attr-label" for="precioSimple">Precio (ARS) <span class="req">*</span></label>
+          <input type="number" id="precioSimple" class="attr-input" min="0" step="0.01">
+        </div>
+        <div class="attr-grupo">
+          <label class="attr-label" for="stockSimple">Stock <span class="req">*</span></label>
+          <input type="number" id="stockSimple" class="attr-input" min="0" step="1">
+        </div>
+      </div>
+    </div>
+
+    <!-- Dimensiones del paquete -->
+    <div class="section-title">Dimensiones del paquete <span class="req">*</span></div>
+    <div class="precio-stock-row" style="flex-wrap:wrap;">
+      <div class="attr-grupo">
+        <label class="attr-label" for="pkgLargo">Largo (cm)</label>
+        <input type="number" id="pkgLargo" class="attr-input" min="1" step="1" placeholder="ej: 30">
+      </div>
+      <div class="attr-grupo">
+        <label class="attr-label" for="pkgAncho">Ancho (cm)</label>
+        <input type="number" id="pkgAncho" class="attr-input" min="1" step="1" placeholder="ej: 20">
+      </div>
+      <div class="attr-grupo">
+        <label class="attr-label" for="pkgAlto">Alto (cm)</label>
+        <input type="number" id="pkgAlto" class="attr-input" min="1" step="1" placeholder="ej: 5">
+      </div>
+      <div class="attr-grupo">
+        <label class="attr-label" for="pkgPeso">Peso (gramos)</label>
+        <input type="number" id="pkgPeso" class="attr-input" min="1" step="1" placeholder="ej: 500">
+      </div>
+    </div>
+
+    <!-- Envíos / Flex -->
+    <div class="section-title">Envíos</div>
+    <div class="flex-box">
+      <input type="checkbox" id="flexCheck">
+      <div>
+        <label for="flexCheck">Activar Flex</label>
+        <div class="flex-desc">Permite entregas el mismo día en zonas habilitadas</div>
+      </div>
+    </div>
+
+    <div class="nav-buttons">
+      <button class="btn btn-secondary" onclick="irPaso(2)">← Volver</button>
+      <button class="btn btn-primary" onclick="confirmarDetalles()">Continuar →</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       PASO 4 — Confirmar
+  ══════════════════════════════════════════ -->
+  <div id="paso4" class="paso">
+    <div id="panelResultado" style="display:none"></div>
+    <div id="panelConfirmar">
+      <div class="paso-titulo">Confirmá y publicá</div>
+      <div id="resumenFinal"></div>
+      <div class="nav-buttons">
+        <button class="btn btn-secondary" onclick="irPaso(3)">← Volver</button>
+        <button class="btn btn-success" id="btnPublicar" onclick="publicar()">Publicar en MercadoLibre</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+// ─────────────────────────────────────────────────────────
+// ESTADO
+// ─────────────────────────────────────────────────────────
+var EST = {
+  productoTN: null,
+  categoria: null,
+  catalogProducto: null,
+  categoriaRequiereCatalogo: false,  // se detecta automáticamente
+  atributosData: null,
+  publicarDatos: null
+};
+var _usarSinCatalogo = false;
+
+// Estado de navegación del árbol
+var NAV = {
+  ruta: [],    // [{id, nombre}] — breadcrumb
+  hijos: []    // [{id, nombre}] — hijos del nivel actual
+};
+
+var _meliVariacionAttrs = [];
+var _apiSearchCats = [];
+
+// ─────────────────────────────────────────────────────────
+// NAVEGACIÓN DE PASOS
+// ─────────────────────────────────────────────────────────
+function irPaso(n) {
+  for (var i = 1; i <= 4; i++) {
+    document.getElementById('paso' + i).classList.remove('active');
+    var si = document.getElementById('si' + i);
+    si.classList.remove('active', 'done');
+    if (i < n) si.classList.add('done');
+  }
+  document.getElementById('paso' + n).classList.add('active');
+  document.getElementById('si' + n).classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+// ─────────────────────────────────────────────────────────
+// PASO 1 — Buscar producto TN
+// ─────────────────────────────────────────────────────────
+function buscarProductos() {
+  var q = document.getElementById('buscadorTN').value.trim();
+  if (q.length < 2) { setHTML('resTN', '<div class="msg-error">Escribí al menos 2 caracteres</div>'); return; }
+  setHTML('resTN', '<div class="loading"><div class="spinner"></div><p>Buscando...</p></div>');
+  google.script.run
+    .withSuccessHandler(renderProductos)
+    .withFailureHandler(function(e) { setHTML('resTN', '<div class="msg-error">Error: ' + esc(e.message) + '</div>'); })
+    .buscarProductosTN(q);
+}
+
+function renderProductos(lista) {
+  if (!lista || !lista.length) { setHTML('resTN', '<div class="empty-state">Sin resultados</div>'); return; }
+  var h = '';
+  for (var i = 0; i < lista.length; i++) {
+    var p = lista[i];
+    var img = p.imagen
+      ? '<img src="' + esc(p.imagen) + '" class="producto-img" onerror="this.style.display=\'none\'">'
+      : '<div class="producto-img-ph">🛏</div>';
+    h += '<div class="producto-item" onclick="seleccionarProducto(' + p.id + ',this)">' +
+      img + '<div class="producto-info">' +
+        '<div class="producto-nombre">' + esc(p.nombre) + '</div>' +
+        '<div class="producto-meta">SKU: ' + esc(p.skuPrincipal||'—') + ' · ' +
+          p.variantesCount + ' variante' + (p.variantesCount !== 1 ? 's' : '') +
+          ' · Stock: ' + p.stockTotal + '</div>' +
+      '</div><div class="producto-precio">$' + fmtNum(p.precio) + '</div></div>';
+  }
+  setHTML('resTN', h);
+}
+
+function seleccionarProducto(id, el) {
+  document.querySelectorAll('.producto-item').forEach(function(x) { x.classList.remove('selected'); });
+  el.classList.add('selected');
+  irPaso(2);
+
+  // Resetear árbol
+  NAV = { ruta: [], hijos: [] };
+  EST.categoria = null;
+  document.getElementById('btnCat').disabled = true;
+  show('catSelBox', false);
+  show('secApiCats', false);
+  show('bcCat', false);
+  show('usarActualBanner', false);
+  setHTML('gridCats', '<div class="loading"><div class="spinner"></div><p>Cargando categorías...</p></div>');
+
+  google.script.run
+    .withSuccessHandler(function(det) {
+      EST.productoTN = det;
+      // Mini card
+      show('miniCard', true);
+      document.getElementById('mcNombre').textContent = det.nombre;
+      document.getElementById('mcMeta').textContent =
+        det.variantes.length + ' variante' + (det.variantes.length !== 1 ? 's' : '') +
+        (det.variantes.length > 0 ? ' · $' + fmtNum(det.variantes[0].precio) : '');
+      if (det.imagenes && det.imagenes.length > 0)
+        document.getElementById('mcImg').src = det.imagenes[0];
+
+      // Cargar categorías raíz
+      cargarRaiz();
+    })
+    .withFailureHandler(function(e) {
+      setHTML('gridCats', '<div class="msg-error">Error cargando producto: ' + esc(e.message) + '</div>');
+    })
+    .obtenerProductoTNDetalle(id);
+}
+
+// ─────────────────────────────────────────────────────────
+// PASO 2 — Árbol de categorías
+// ─────────────────────────────────────────────────────────
+function cargarRaiz() {
+  NAV = { ruta: [], hijos: [] };
+  setHTML('gridCats', '<div class="loading"><div class="spinner"></div><p>Cargando categorías...</p></div>');
+  show('bcCat', false);
+  show('usarActualBanner', false);
+
+  google.script.run
+    .withSuccessHandler(function(cats) {
+      NAV.hijos = cats;
+      renderGrid(cats);
+    })
+    .withFailureHandler(function(e) {
+      setHTML('gridCats', '<div class="msg-error">Error: ' + esc(e.message) + '</div>');
+    })
+    .obtenerCategoriasRaizMeli();
+}
+
+function navegarCategoria(id, nombre) {
+  setHTML('gridCats', '<div class="loading"><div class="spinner"></div><p>Cargando ' + esc(nombre) + '...</p></div>');
+  show('usarActualBanner', false);
+
+  google.script.run
+    .withSuccessHandler(function(data) {
+      NAV.ruta = data.ruta;
+      NAV.hijos = data.hijos;
+      renderBreadcrumb(data.ruta);
+      renderGrid(data.hijos);
+
+      // Banner "Usar esta categoría" para niveles intermedios con hijos
+      if (data.hijos.length > 0) {
+        document.getElementById('usarActualNombre').textContent = data.nombre;
+        show('usarActualBanner', true);
+      } else {
+        // Es una hoja: seleccionar automáticamente
+        show('usarActualBanner', false);
+        seleccionarCategoria(data.id, data.nombre);
+      }
+    })
+    .withFailureHandler(function(e) {
+      setHTML('gridCats', '<div class="msg-error">Error cargando categoría: ' + esc(e.message) + '</div>');
+    })
+    .obtenerSubcategoriasMeli(id);
+}
+
+function renderBreadcrumb(ruta) {
+  if (!ruta || ruta.length === 0) { show('bcCat', false); return; }
+  show('bcCat', true);
+  var h = '<span class="bc-item" onclick="irNivelRaiz()">🏠 Inicio</span>';
+  for (var i = 0; i < ruta.length; i++) {
+    h += '<span class="bc-sep">›</span>';
+    if (i < ruta.length - 1) {
+      h += '<span class="bc-item" onclick="irNivelRuta(' + i + ')">' + esc(ruta[i].nombre) + '</span>';
+    } else {
+      h += '<span class="bc-current">' + esc(ruta[i].nombre) + '</span>';
+    }
+  }
+  setHTML('bcCatInner', h);
+}
+
+function renderGrid(cats) {
+  if (!cats || cats.length === 0) {
+    setHTML('gridCats', '<div class="empty-state">Sin subcategorías</div>');
+    return;
+  }
+  var h = '<div class="cat-grid">';
+  for (var i = 0; i < cats.length; i++) {
+    var c = cats[i];
+    h += '<div class="cat-item" onclick="navegarCategoria(\'' + esc(c.id) + '\',\'' + esc(c.nombre) + '\')" data-nombre="' + esc(c.nombre.toLowerCase()) + '">' +
+      '<div class="cat-item-left">' +
+        '<div class="cat-item-nombre">' + esc(c.nombre) + '</div>' +
+      '</div>' +
+      '<div class="cat-item-arrow">›</div>' +
+    '</div>';
+  }
+  h += '</div>';
+  setHTML('gridCats', h);
+}
+
+function irNivelRaiz() {
+  cerrarBusqueda();
+  cargarRaiz();
+}
+
+function irNivelRuta(idx) {
+  cerrarBusqueda();
+  var cat = NAV.ruta[idx];
+  if (cat) navegarCategoria(cat.id, cat.nombre);
+}
+
+function seleccionarCatActual() {
+  // Seleccionar el nivel de navegación actual (el último en la ruta)
+  if (NAV.ruta && NAV.ruta.length > 0) {
+    var last = NAV.ruta[NAV.ruta.length - 1];
+    seleccionarCategoria(last.id, last.nombre);
+  }
+}
+
+function seleccionarCategoria(id, nombre) {
+  EST.categoria = { id: id, nombre: nombre };
+  document.getElementById('catSelNombre').textContent = nombre + ' (' + id + ')';
+  show('catSelBox', true);
+  document.getElementById('btnCat').disabled = false;
+}
+
+function deseleccionarCat() {
+  EST.categoria = null;
+  show('catSelBox', false);
+  document.getElementById('btnCat').disabled = true;
+}
+
+function filtrarCatsVisible() {
+  var q = document.getElementById('buscadorCat').value.trim().toLowerCase();
+  var items = document.querySelectorAll('.cat-item');
+  var encontrados = 0;
+  items.forEach(function(item) {
+    var nombre = item.getAttribute('data-nombre') || '';
+    if (!q || nombre.indexOf(q) !== -1) {
+      item.classList.remove('oculto');
+      encontrados++;
+    } else {
+      item.classList.add('oculto');
+    }
+  });
+}
+
+function buscarCatsAPI() {
+  var q = document.getElementById('buscadorCat').value.trim();
+  if (q.length < 2) { return; }
+  show('secApiCats', true);
+  setHTML('listaApiCats', '<div class="loading" style="padding:16px;"><div class="spinner"></div></div>');
+
+  google.script.run
+    .withSuccessHandler(function(cats) {
+      _apiSearchCats = cats || [];
+      if (!cats || cats.length === 0) {
+        setHTML('listaApiCats', '<div class="empty-state" style="padding:12px;">Sin resultados para "' + esc(q) + '"</div>');
+        return;
+      }
+      var h = '<div class="cat-grid">';
+      for (var i = 0; i < cats.length; i++) {
+        var c = cats[i];
+        h += '<div class="cat-item" onclick="elegirCatAPI(' + i + ')">' +
+          '<div class="cat-item-left">' +
+            '<div class="cat-item-nombre">' + esc(c.nombre) + '</div>' +
+            (c.dominio ? '<div class="cat-item-meta">' + esc(c.dominio) + '</div>' : '') +
+          '</div>' +
+          '<div class="cat-item-arrow" style="color:#1976d2;font-size:13px;">Elegir</div>' +
+        '</div>';
+      }
+      h += '</div>';
+      setHTML('listaApiCats', h);
+    })
+    .withFailureHandler(function(e) {
+      setHTML('listaApiCats', '<div class="msg-error">Error: ' + esc(e.message) + '</div>');
+    })
+    .buscarCategoriasMeli(q);
+}
+
+function elegirCatAPI(idx) {
+  var c = _apiSearchCats[idx];
+  if (!c) return;
+  seleccionarCategoria(c.id, c.nombre);
+}
+
+function cerrarBusqueda() {
+  show('secApiCats', false);
+  document.getElementById('buscadorCat').value = '';
+  // Quitar filtro del grid
+  document.querySelectorAll('.cat-item').forEach(function(x) { x.classList.remove('oculto'); });
+}
+
+function confirmarCat() {
+  if (!EST.categoria) { alert('Seleccioná una categoría'); return; }
+  cargarPaso3();
+}
+
+// ─────────────────────────────────────────────────────────
+// PASO 3 — Detalles
+// ─────────────────────────────────────────────────────────
+function cargarPaso3() {
+  irPaso(3);
+
+  // Reset catálogo
+  EST.catalogProducto = null;
+  EST.categoriaRequiereCatalogo = false;
+  _usarSinCatalogo = false;
+  show('secCatalogo', true);
+  show('catalogSelBox', false);
+  show('secTitulo', false);
+  setHTML('resCatalog', '<div class="loading" style="padding:8px;"><div class="spinner"></div></div>');
+  var q = EST.productoTN.nombre.substring(0, 60);
+  document.getElementById('buscadorCatalog').value = q;
+
+  // Pre-llenar título por si el usuario elige sin catálogo
+  var tit = EST.productoTN.nombre;
+  if (tit.length > 60) tit = tit.substring(0, 57) + '...';
+  document.getElementById('tituloMeli').value = tit;
+  actualizarContador();
+
+  document.getElementById('bc3').textContent =
+    EST.productoTN.nombre + ' → ' + EST.categoria.nombre + ' (' + EST.categoria.id + ')';
+
+  // Verificar si la categoría requiere catálogo (en paralelo)
+  google.script.run
+    .withSuccessHandler(function(res) {
+      EST.categoriaRequiereCatalogo = res.requiereCatalogo;
+      actualizarUIcatalogo();
+      buscarCatalog();
+    })
+    .withFailureHandler(function() {
+      buscarCatalog(); // igual buscar aunque falle el check
+    })
+    .checkCategoriaCatalogo(EST.categoria.id);
+
+  // Cargar atributos de categoría en paralelo
+  show('loadAttrs', true);
+  show('secAttrs', false); show('secOpcionales', false);
+  show('secVariantes', false); show('secSimple', false);
+
+  google.script.run
+    .withSuccessHandler(function(data) {
+      EST.atributosData = data;
+      show('loadAttrs', false);
+      renderAtributos(data.requeridos || [], data.opcionales || []);
+      renderVariantes(data.variacion || []);
+    })
+    .withFailureHandler(function(e) {
+      show('loadAttrs', false);
+      setHTML('formAttrs', '<div class="msg-error">Error: ' + esc(e.message) + '</div>');
+      show('secAttrs', true);
+      renderVariantes([]);
+    })
+    .obtenerAtributosCategoriasMeli(EST.categoria.id);
+}
+
+function actualizarContador() {
+  var len = document.getElementById('tituloMeli').value.length;
+  var el = document.getElementById('contadorTitulo');
+  el.textContent = len;
+  el.style.color = len > 55 ? (len > 60 ? '#c62828' : '#f57c00') : '#888';
+}
+
+function renderAtributos(reqs, opts) {
+  // ── Requeridos ──
+  if (!reqs.length) {
+    show('secAttrs', false);
+  } else {
+    show('secAttrs', true);
+    setHTML('formAttrs', buildAttrForm(reqs, true));
+  }
+  // ── Opcionales ──
+  if (!opts || !opts.length) {
+    show('secOpcionales', false);
+  } else {
+    show('secOpcionales', true);
+    setHTML('formOpcionales', buildAttrForm(opts, false));
+  }
+}
+
+function buildAttrForm(attrs, requerido) {
+  var h = '';
+  for (var i = 0; i < attrs.length; i++) {
+    var a = attrs[i];
+    var labelSuffix = requerido ? '<span class="req">*</span>' : '';
+    h += '<div class="attr-grupo"><label class="attr-label" for="attr_' + esc(a.id) + '">' +
+      esc(a.nombre) + labelSuffix + '</label>';
+    if (a.valoresPermitidos && a.valoresPermitidos.length > 0) {
+      // datalist para permitir texto libre además de las opciones
+      var dlId = 'dl_attr_' + esc(a.id);
+      h += '<datalist id="' + dlId + '">';
+      for (var v = 0; v < a.valoresPermitidos.length; v++) {
+        h += '<option value="' + esc(a.valoresPermitidos[v].nombre) + '">';
+      }
+      h += '</datalist>';
+      h += '<input type="text" class="attr-input" id="attr_' + esc(a.id) + '" ' +
+        'list="' + dlId + '" data-id="' + esc(a.id) + '" ' +
+        'data-valperm=\'' + JSON.stringify(a.valoresPermitidos) + '\' ' +
+        'placeholder="Escribí o elegí de la lista...">';
+    } else {
+      h += '<input type="' + (a.tipo === 'number' ? 'number' : 'text') + '" ' +
+        'class="attr-input" id="attr_' + esc(a.id) + '" data-id="' + esc(a.id) + '">';
+    }
+    h += '</div>';
+  }
+  return h;
+}
+
+function toggleOpcionales() {
+  var el = document.getElementById('formOpcionales');
+  var icon = document.getElementById('iconOpcionales');
+  if (!el) return;
+  var oculto = el.style.display === 'none';
+  el.style.display = oculto ? '' : 'none';
+  icon.textContent = oculto ? '▲' : '▼';
+}
+
+function renderVariantes(meliVariacion) {
+  _meliVariacionAttrs = meliVariacion;
+  var prod = EST.productoTN;
+  if (!prod.tieneVariantes || meliVariacion.length === 0) {
+    show('secSimple', true); show('secVariantes', false);
+    var v0 = prod.variantes[0] || {};
+    document.getElementById('precioSimple').value = v0.precio || '';
+    document.getElementById('stockSimple').value = v0.stock || 0;
+    return;
+  }
+  show('secVariantes', true); show('secSimple', false);
+  document.getElementById('varInfo').textContent =
+    prod.variantes.length + ' variantes. Indicá a qué atributo MeLi corresponde cada dimensión.';
+
+  var dims = prod.atributosNombres, variantes = prod.variantes, h = '';
+  for (var d = 0; d < dims.length; d++) {
+    var tnValsUnicos = [], seenV = {};
+    for (var vi = 0; vi < variantes.length; vi++) {
+      var val = variantes[vi].valores[d] || '';
+      if (val && !seenV[val]) { seenV[val] = true; tnValsUnicos.push(val); }
+    }
+    var autoAttr = autoMatchAttr(dims[d], meliVariacion);
+    h += '<div class="dim-block" id="db_' + d + '"><div class="dim-header">' +
+      '<span class="dim-nombre">' + esc(dims[d]) + '</span><span class="dim-arrow">→</span>' +
+      '<select class="dim-select" id="dimAttr_' + d + '" onchange="refrescarValores(' + d + ')">' +
+      '<option value="">— Elegí atributo MeLi —</option>';
+    for (var ma = 0; ma < meliVariacion.length; ma++) {
+      h += '<option value="' + esc(meliVariacion[ma].id) + '"' + (meliVariacion[ma].id === autoAttr ? ' selected' : '') + '>' + esc(meliVariacion[ma].nombre) + '</option>';
+    }
+    h += '</select></div><table class="val-table"><thead><tr><th>Valor en TiendaNube</th><th>Valor en MercadoLibre</th></tr></thead><tbody id="vt_' + d + '">';
+    for (var vj = 0; vj < tnValsUnicos.length; vj++) {
+      h += '<tr><td class="tn-val">' + esc(tnValsUnicos[vj]) + '</td><td>' +
+        '<input type="text" class="attr-input" style="margin:0;padding:6px 10px;" id="vm_' + d + '_' + vj + '" value="' + esc(tnValsUnicos[vj]) + '" data-tn="' + esc(tnValsUnicos[vj]) + '" data-vi="' + vj + '"></td></tr>';
+    }
+    h += '</tbody></table></div>';
+  }
+  setHTML('formVariantes', h);
+  for (var dd = 0; dd < dims.length; dd++) {
+    if (autoMatchAttr(dims[dd], meliVariacion)) refrescarValores(dd);
+  }
+}
+
+function autoMatchAttr(dimNombre, meliVars) {
+  var dn = dimNombre.toUpperCase();
+  for (var m = 0; m < meliVars.length; m++) {
+    var mn = (meliVars[m].nombre || '').toUpperCase();
+    if (dn === mn) return meliVars[m].id;
+    if ((dn.indexOf('TAMA') !== -1 || dn === 'SIZE') && (mn.indexOf('TAMA') !== -1 || mn.indexOf('SIZE') !== -1)) return meliVars[m].id;
+    if ((dn === 'COLOR' || dn === 'COLOUR') && mn === 'COLOR') return meliVars[m].id;
+    if (dn.indexOf('TALL') !== -1 && mn.indexOf('TALL') !== -1) return meliVars[m].id;
+  }
+  return '';
+}
+
+function refrescarValores(d) {
+  var sel = document.getElementById('dimAttr_' + d);
+  if (!sel || !sel.value) return;
+  var valPerm = [];
+  for (var m = 0; m < _meliVariacionAttrs.length; m++) {
+    if (_meliVariacionAttrs[m].id === sel.value) { valPerm = _meliVariacionAttrs[m].valoresPermitidos || []; break; }
+  }
+  if (!valPerm.length) return;
+  var tbody = document.getElementById('vt_' + d);
+  if (!tbody) return;
+  tbody.querySelectorAll('tr').forEach(function(row, r) {
+    var td = row.cells[1];
+    var inp = td.querySelector('input, select');
+    if (!inp) return;
+    var tnVal = inp.getAttribute('data-tn') || '';
+    var vi = inp.getAttribute('data-vi') || r;
+    var bestId = '', bestNombre = '', tnUp = tnVal.toUpperCase();
+    for (var m2 = 0; m2 < valPerm.length; m2++) {
+      if ((valPerm[m2].nombre||'').toUpperCase() === tnUp) { bestId = valPerm[m2].id; bestNombre = valPerm[m2].nombre; break; }
+    }
+    if (!bestId) {
+      for (var m3 = 0; m3 < valPerm.length; m3++) {
+        var vn = (valPerm[m3].nombre||'').toUpperCase();
+        if (vn.indexOf(tnUp) !== -1 || tnUp.indexOf(vn) !== -1) { bestId = valPerm[m3].id; bestNombre = valPerm[m3].nombre; break; }
+      }
+    }
+    var dlId = 'dl_' + d + '_' + vi;
+    var sh = '<datalist id="' + dlId + '">';
+    for (var sv = 0; sv < valPerm.length; sv++) {
+      sh += '<option value="' + esc(valPerm[sv].nombre) + '">';
+    }
+    sh += '</datalist>';
+    sh += '<input type="text" class="attr-input" style="margin:0;padding:6px 10px;" ' +
+      'id="vm_' + d + '_' + vi + '" ' +
+      'value="' + esc(bestNombre || tnVal) + '" ' +
+      'list="' + dlId + '" ' +
+      'data-tn="' + esc(tnVal) + '" data-vi="' + vi + '" ' +
+      'data-valperm=\'' + JSON.stringify(valPerm) + '\' ' +
+      'placeholder="Escribí o elegí de la lista...">';
+    td.innerHTML = sh;
+  });
+}
+
+// ─────────────────────────────────────────────────────────
+// CATÁLOGO MELI
+// ─────────────────────────────────────────────────────────
+function buscarCatalog() {
+  var q = document.getElementById('buscadorCatalog').value.trim();
+  if (q.length < 2) return;
+  setHTML('resCatalog', '<div class="loading" style="padding:12px;"><div class="spinner"></div></div>');
+
+  google.script.run
+    .withSuccessHandler(function(lista) {
+      if (!lista || !lista.length) {
+        setHTML('resCatalog',
+          '<div class="empty-state" style="padding:12px;">Sin resultados para "' + esc(q) + '"' +
+          ' — probá con otras palabras o elegí "publicar sin catálogo"</div>');
+        return;
+      }
+      var h = '';
+      for (var i = 0; i < lista.length; i++) {
+        var p = lista[i];
+        var img = p.imagen
+          ? '<img src="' + esc(p.imagen) + '" onerror="this.style.display=\'none\'">'
+          : '<div class="ci-ph">🛏</div>';
+        h += '<div class="catalog-item" onclick="seleccionarCatalog(\'' + esc(p.id) + '\',\'' + esc(p.nombre) + '\')">' +
+          img +
+          '<div class="ci-info">' +
+            '<div class="ci-nombre">' + esc(p.nombre) + '</div>' +
+            (p.atributos ? '<div class="ci-attrs">' + esc(p.atributos) + '</div>' : '') +
+          '</div>' +
+          '<div class="ci-id">' + esc(p.id) + '</div>' +
+        '</div>';
+      }
+      setHTML('resCatalog', h);
+    })
+    .withFailureHandler(function(e) {
+      setHTML('resCatalog', '<div class="msg-error">Error buscando catálogo: ' + esc(e.message) + '</div>');
+    })
+    .buscarProductoCatalogMeli(q, EST.categoria.id);
+}
+
+function seleccionarCatalog(id, nombre) {
+  EST.catalogProducto = { id: id, nombre: nombre };
+  _usarSinCatalogo = false;
+  setHTML('resCatalog', '');
+  document.getElementById('catalogSelNombre').textContent = nombre;
+  document.getElementById('catalogSelId').textContent = id;
+  show('catalogSelBox', true);
+  // Con catálogo: ocultar campo de título (MeLi lo controla)
+  show('secTitulo', false);
+}
+
+function deseleccionarCatalog() {
+  EST.catalogProducto = null;
+  show('catalogSelBox', false);
+  show('secTitulo', false);
+  setHTML('resCatalog', '');
+}
+
+function actualizarUIcatalogo() {
+  var link = document.getElementById('linkSinCatalogo');
+  var msg = document.getElementById('msgCatalogo');
+  if (!link) return;
+  if (EST.categoriaRequiereCatalogo) {
+    link.style.display = 'none';
+    if (msg) msg.textContent = '⚠️ Esta categoría exige catálogo obligatoriamente. Buscá el producto más parecido en la lista y seleccionalo. Si no encontrás nada, volvé al Paso 2 y elegí otra categoría.';
+  } else {
+    link.style.display = '';
+    if (msg) msg.textContent = 'Buscá tu producto en el catálogo de MercadoLibre. Si no lo encontrás, usá el botón de abajo para publicar con título libre.';
+  }
+}
+
+function saltarCatalogo() {
+  if (EST.categoriaRequiereCatalogo) {
+    alert('Esta categoría (' + EST.categoria.nombre + ') requiere seleccionar un producto del catálogo de MercadoLibre. No es posible publicar con título libre aquí.\n\nOpciones:\n1. Buscá el producto más parecido en el catálogo y seleccionalo\n2. Volvé al Paso 2 y elegí una categoría más general (ej: "Ropa de Cama")');
+    return;
+  }
+  EST.catalogProducto = null;
+  _usarSinCatalogo = true;
+  show('secCatalogo', false);
+  show('secTitulo', true);
+  actualizarContador();
+}
+
+function tryMatchValueId(el, val) {
+  try {
+    var vp = JSON.parse(el.getAttribute('data-valperm') || '[]');
+    var valUp = val.toUpperCase();
+    for (var i = 0; i < vp.length; i++) {
+      if ((vp[i].nombre || '').toUpperCase() === valUp) return vp[i].id;
+    }
+  } catch(ex) {}
+  return '';
+}
+
+function confirmarDetalles() {
+  // Validar catálogo o título
+  if (!EST.catalogProducto && !_usarSinCatalogo) {
+    alert('Seleccioná un producto del catálogo MeLi, o hacé clic en "publicar sin catálogo".');
+    return;
+  }
+  var titulo = '';
+  if (_usarSinCatalogo) {
+    titulo = document.getElementById('tituloMeli').value.trim();
+    if (!titulo) { alert('Ingresá el título'); return; }
+    if (titulo.length > 60) { alert('El título no puede tener más de 60 caracteres'); return; }
+  }
+
+  var atributos = [];
+
+  // Requeridos
+  var reqs = (EST.atributosData && EST.atributosData.requeridos) || [];
+  for (var i = 0; i < reqs.length; i++) {
+    var a = reqs[i];
+    var el = document.getElementById('attr_' + a.id);
+    if (!el) continue;
+    var val = el.value.trim();
+    if (!val) { alert('Completá el campo requerido: ' + a.nombre); el.focus(); return; }
+    var obj = { id: a.id };
+    var mid = tryMatchValueId(el, val);
+    if (mid) { obj.value_id = mid; obj.value_name = val; } else obj.value_name = val;
+    atributos.push(obj);
+  }
+
+  // Opcionales (se omiten si están vacíos)
+  var opts = (EST.atributosData && EST.atributosData.opcionales) || [];
+  for (var j = 0; j < opts.length; j++) {
+    var ao = opts[j];
+    var elo = document.getElementById('attr_' + ao.id);
+    if (!elo) continue;
+    var valo = elo.value.trim();
+    if (!valo) continue;
+    var objo = { id: ao.id };
+    var mido = tryMatchValueId(elo, valo);
+    if (mido) { objo.value_id = mido; objo.value_name = valo; } else objo.value_name = valo;
+    atributos.push(objo);
+  }
+
+  // Dimensiones del paquete
+  var largo = parseInt(document.getElementById('pkgLargo').value, 10) || null;
+  var ancho = parseInt(document.getElementById('pkgAncho').value, 10) || null;
+  var alto  = parseInt(document.getElementById('pkgAlto').value,  10) || null;
+  var peso  = parseInt(document.getElementById('pkgPeso').value,  10) || null;
+
+  var flex = document.getElementById('flexCheck').checked;
+  var prod = EST.productoTN;
+  var variantes = null, precio = null, stock = null, skuTN = null;
+
+  if (prod.tieneVariantes && EST.atributosData && EST.atributosData.variacion.length > 0) {
+    variantes = buildVariantes();
+    if (!variantes) return;
+  } else {
+    precio = parseFloat(document.getElementById('precioSimple').value) || 0;
+    stock = parseInt(document.getElementById('stockSimple').value, 10) || 0;
+    if (!precio) { alert('Ingresá el precio'); return; }
+    skuTN = (prod.variantes[0] || {}).sku || '';
+  }
+
+  EST.publicarDatos = {
+    titulo: titulo,
+    catalogProductId: EST.catalogProducto ? EST.catalogProducto.id : null,
+    categoryId: EST.categoria.id,
+    descripcion: prod.descripcion, imagenes: prod.imagenes,
+    atributos: atributos, flex: flex,
+    variantes: variantes, precio: precio, stock: stock, skuTN: skuTN,
+    largo: largo, ancho: ancho, alto: alto, peso: peso
+  };
+  irPaso(4);
+  mostrarResumen();
+}
+
+function buildVariantes() {
+  var prod = EST.productoTN, dims = prod.atributosNombres, variantes = prod.variantes;
+  var dimAttrMap = [];
+  for (var d = 0; d < dims.length; d++) {
+    var selEl = document.getElementById('dimAttr_' + d);
+    if (!selEl || !selEl.value) { alert('Seleccioná el atributo MeLi para "' + dims[d] + '"'); return null; }
+    var tnVals = [], seenV = {};
+    for (var vi = 0; vi < variantes.length; vi++) {
+      var tv = variantes[vi].valores[d] || '';
+      if (tv && !seenV[tv]) { seenV[tv] = true; tnVals.push(tv); }
+    }
+    var valMap = {};
+    for (var vj = 0; vj < tnVals.length; vj++) {
+      var inp = document.getElementById('vm_' + d + '_' + vj);
+      if (!inp) continue;
+      var mv;
+      var fv = inp.value.trim();
+      if (!fv) { alert('Ingresá el valor de MeLi para "' + tnVals[vj] + '"'); return null; }
+      // Intentar matchear con la lista de valores permitidos para enviar value_id
+      var matchId = '', matchNombre = fv;
+      try {
+        var vp = JSON.parse(inp.getAttribute('data-valperm') || '[]');
+        var fvUp = fv.toUpperCase();
+        for (var vm = 0; vm < vp.length; vm++) {
+          if ((vp[vm].nombre || '').toUpperCase() === fvUp) {
+            matchId = vp[vm].id; matchNombre = vp[vm].nombre; break;
+          }
+        }
+      } catch(ex) {}
+      mv = matchId ? { id: matchId, nombre: matchNombre } : { nombre: fv };
+      valMap[tnVals[vj]] = mv;
+    }
+    dimAttrMap.push({ meliAttrId: selEl.value, valMap: valMap });
+  }
+  return variantes.map(function(v) {
+    var combos = dims.map(function(_, dd) {
+      var tnVal = v.valores[dd] || '';
+      var mapping = dimAttrMap[dd];
+      var mv = mapping.valMap[tnVal] || { nombre: tnVal };
+      var combo = { id: mapping.meliAttrId };
+      if (mv.id) { combo.value_id = mv.id; combo.value_name = mv.nombre; }
+      else combo.value_name = mv.nombre;
+      return combo;
+    });
+    return { sku: v.sku, precio: v.precio, stock: v.stock, tnVariantNombre: v.nombre, attribute_combinations: combos };
+  });
+}
+
+// ─────────────────────────────────────────────────────────
+// PASO 4 — Resumen + publicar
+// ─────────────────────────────────────────────────────────
+function mostrarResumen() {
+  var d = EST.publicarDatos, prod = EST.productoTN;
+  var h = '';
+  if (prod.imagenes && prod.imagenes.length > 0)
+    h += '<div class="resumen-img"><img src="' + esc(prod.imagenes[0]) + '"></div>';
+  if (EST.catalogProducto)
+    h += resRow('Catálogo MeLi', EST.catalogProducto.nombre + ' (' + EST.catalogProducto.id + ')');
+  else
+    h += resRow('Título', d.titulo);
+  h += resRow('Categoría', EST.categoria.nombre + ' (' + EST.categoria.id + ')');
+  if (d.variantes && d.variantes.length > 0) {
+    var ps = d.variantes.map(function(v) { return v.precio; });
+    var pMin = Math.min.apply(null, ps), pMax = Math.max.apply(null, ps);
+    h += resRow('Precio', pMin === pMax ? '$' + fmtNum(pMin) : '$' + fmtNum(pMin) + ' – $' + fmtNum(pMax));
+    h += resRow('Stock', d.variantes.reduce(function(s,v){return s+v.stock;},0) + ' un. en ' + d.variantes.length + ' variantes');
+  } else {
+    h += resRow('Precio', '$' + fmtNum(d.precio));
+    h += resRow('Stock', d.stock + ' unidades');
+    if (d.skuTN) h += resRow('SKU', d.skuTN);
+  }
+  h += resRow('Fotos', (d.imagenes||[]).length + ' imágenes');
+  if (d.largo && d.ancho && d.alto && d.peso)
+    h += resRow('Paquete', d.largo + ' × ' + d.ancho + ' × ' + d.alto + ' cm · ' + d.peso + ' g');
+  h += resRow('Tipo', 'Clásica (gold_special)');
+  h += resRow('Logística', 'Depósito (drop_off)');
+  h += resRow('Flex', d.flex ? '✅ Activado' : '❌ No');
+  if (d.atributos && d.atributos.length > 0)
+    h += resRow('Atributos', d.atributos.map(function(a){return a.value_name;}).join(', '));
+  setHTML('resumenFinal', h);
+}
+
+function resRow(lbl, val) {
+  return '<div class="resumen-row"><span class="lbl">' + esc(lbl) + '</span><span class="val">' + esc(String(val)) + '</span></div>';
+}
+
+function publicar() {
+  var btn = document.getElementById('btnPublicar');
+  btn.disabled = true; btn.textContent = 'Publicando...';
+  var prev = document.querySelector('#panelConfirmar .msg-error');
+  if (prev) prev.remove();
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      show('panelConfirmar', false);
+      var ids = res.mlaIds && res.mlaIds.length > 1
+        ? res.mlaIds.join(', ')
+        : esc(res.mlaId);
+      var varInfo = res.variantesPublicadas > 1
+        ? '<p>' + res.variantesPublicadas + ' publicaciones creadas (una por variante, familia enlazada)</p>'
+        : '';
+      setHTML('panelResultado',
+        '<div class="msg-success">' +
+          '<h3>✅ Publicado correctamente</h3>' +
+          '<p><strong>' + esc(res.titulo) + '</strong></p>' +
+          varInfo +
+          '<p>IDs: <strong>' + ids + '</strong></p>' +
+          '<p>' +
+            '<a class="btn-meli" href="' + esc(res.permalink) + '" target="_blank">Ver en MercadoLibre</a>' +
+            '&nbsp;&nbsp;<button class="btn btn-secondary" onclick="nuevaPublicacion()" style="vertical-align:middle;margin-top:12px;">Publicar otro</button>' +
+          '</p>' +
+          '<p style="margin-top:12px;font-size:13px;color:#666;">La vinculación se guardó automáticamente en la hoja Vinculaciones.</p>' +
+        '</div>');
+      show('panelResultado', true);
+      for (var i = 1; i <= 4; i++) { var si = document.getElementById('si'+i); si.classList.remove('active'); si.classList.add('done'); }
+    })
+    .withFailureHandler(function(e) {
+      btn.disabled = false; btn.textContent = 'Publicar en MercadoLibre';
+      var msg = e.message || e.toString();
+      if (msg.indexOf('title') !== -1 && msg.indexOf('invalid') !== -1) {
+        // Catálogo requerido: volver al Paso 3 automáticamente
+        EST.categoriaRequiereCatalogo = true;
+        _usarSinCatalogo = false;
+        show('secCatalogo', true);
+        show('catalogSelBox', false);
+        show('secTitulo', false);
+        actualizarUIcatalogo();
+        irPaso(3);
+        var msgEl = document.getElementById('msgCatalogo');
+        if (msgEl) msgEl.innerHTML = '<strong>⚠️ Esta categoría exige catálogo.</strong> Seleccioná el producto más parecido de la lista. Si no hay coincidencia exacta, elegí el más genérico (ej: "Cubre sommier 2 plazas").';
+        return;
+      }
+      if (msg.indexOf('family_name') !== -1) {
+        msg = '❌ Error: ' + msg;
+      } else {
+        msg = '❌ Error: ' + msg;
+      }
+      var div = document.createElement('div');
+      div.className = 'msg-error';
+      div.style.whiteSpace = 'pre-line';
+      div.textContent = msg;
+      document.getElementById('panelConfirmar').insertBefore(div, document.getElementById('panelConfirmar').firstChild);
+    })
+    .publicarEnMeli(EST.publicarDatos);
+}
+
+function nuevaPublicacion() {
+  EST = { productoTN: null, categoria: null, catalogProducto: null, atributosData: null, publicarDatos: null };
+  _usarSinCatalogo = false;
+  NAV = { ruta: [], hijos: [] };
+  _meliVariacionAttrs = []; _apiSearchCats = [];
+  document.getElementById('buscadorTN').value = '';
+  document.getElementById('buscadorCat').value = '';
+  document.getElementById('flexCheck').checked = false;
+  setHTML('resTN', '<div class="empty-state">Escribí el nombre y presioná Buscar</div>');
+  show('panelConfirmar', true); show('panelResultado', false);
+  irPaso(1);
+}
+
+// ─────────────────────────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────────────────────────
+function esc(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function fmtNum(n) { return n ? Math.round(n).toLocaleString('es-AR') : '0'; }
+function setHTML(id, html) { var el = document.getElementById(id); if (el) el.innerHTML = html; }
+function show(id, v) { var el = document.getElementById(id); if (el) el.style.display = v ? '' : 'none'; }
+</script>
+</body>
+</html>

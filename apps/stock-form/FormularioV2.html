@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+      background: #f0f2f5; min-height: 100vh; min-height: 100dvh;
+      display: flex; justify-content: center; padding: 12px;
+    }
+    .container {
+      background: white; border-radius: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+      padding: 24px; max-width: 540px; width: 100%; height: fit-content;
+    }
+    .header { text-align: center; margin-bottom: 24px; }
+    .header h1 { color: #1a1a1a; font-size: 20px; margin-bottom: 2px; }
+    .header p { color: #888; font-size: 13px; }
+    .form-group { margin-bottom: 18px; }
+    label.field-label { display: block; font-weight: 600; color: #333; margin-bottom: 6px; font-size: 14px; }
+    label .required { color: #e53935; }
+
+    /* Search */
+    .search-container { position: relative; }
+    .search-input {
+      width: 100%; padding: 12px 14px; border: 2px solid #ddd; border-radius: 10px;
+      font-size: 16px; transition: border-color 0.2s; outline: none; -webkit-appearance: none;
+    }
+    .search-input:focus { border-color: #1976d2; }
+    .search-results {
+      position: absolute; top: 100%; left: 0; right: 0; background: white;
+      border: 2px solid #1976d2; border-top: none; border-radius: 0 0 10px 10px;
+      max-height: 220px; overflow-y: auto; z-index: 100; display: none; -webkit-overflow-scrolling: touch;
+    }
+    .search-results.visible { display: block; }
+    .search-result-item { padding: 12px 14px; cursor: pointer; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+    .search-result-item:active, .search-result-item.highlighted { background: #e8f4fd; }
+    .search-result-item .sku-code { font-weight: 700; color: #1976d2; }
+    .search-result-item .sku-name { color: #666; font-size: 13px; display: block; margin-top: 2px; }
+
+    /* Selected SKU */
+    .selected-sku {
+      background: #e8f5e9; border: 2px solid #4caf50; border-radius: 10px;
+      padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; font-size: 14px;
+    }
+    .selected-sku .sku-info { flex: 1; }
+    .selected-sku .sku-code { font-weight: 700; color: #2e7d32; }
+    .selected-sku .sku-name { color: #666; font-size: 13px; }
+    .btn-clear { background: none; border: none; color: #999; font-size: 22px; cursor: pointer; padding: 4px 8px; border-radius: 6px; line-height: 1; }
+
+    /* Select & inputs */
+    select {
+      width: 100%; padding: 12px 14px; border: 2px solid #ddd; border-radius: 10px;
+      font-size: 16px; background: white; transition: border-color 0.2s; outline: none;
+      -webkit-appearance: none; appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px;
+    }
+    select:focus { border-color: #1976d2; }
+
+    /* Radio cards for ubicacion */
+    .radio-group { display: grid; gap: 8px; }
+    .radio-group.cols-2 { grid-template-columns: 1fr 1fr; }
+    .radio-card { position: relative; }
+    .radio-card input[type="radio"] { position: absolute; opacity: 0; width: 0; height: 0; }
+    .radio-card label {
+      display: flex; flex-direction: column; align-items: center; padding: 12px 8px;
+      border: 2px solid #ddd; border-radius: 10px; cursor: pointer; transition: all 0.2s;
+      font-weight: 500; font-size: 13px; text-align: center; min-height: 68px; justify-content: center;
+    }
+    .radio-card label .icon { font-size: 22px; margin-bottom: 4px; }
+    .radio-card input:checked + label { border-color: #1976d2; background: #e8f4fd; color: #1976d2; }
+
+    /* Grilla de variantes */
+    .grid-section { margin-top: 16px; }
+    .grid-container {
+      border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden;
+    }
+    .grid-header {
+      display: grid; grid-template-columns: 1fr 60px 60px 55px;
+      gap: 6px; padding: 8px 10px; background: #f8f9fa;
+      font-size: 12px; font-weight: 600; color: #666; text-transform: uppercase;
+    }
+    .grid-header span:not(:first-child) { text-align: center; }
+    .grid-header .col-active { color: #1976d2; }
+    .grid-row {
+      display: grid; grid-template-columns: 1fr 60px 60px 55px;
+      gap: 6px; padding: 8px 10px; border-bottom: 1px solid #f0f0f0;
+      align-items: center; transition: background 0.2s;
+    }
+    .grid-row:last-child { border-bottom: none; }
+    .grid-row.changed { background: #f5f5f5; }
+    .grid-row .variante-name { font-size: 14px; color: #333; }
+    .grid-row .stock-other {
+      text-align: center; font-size: 14px; color: #999; font-weight: 500;
+    }
+    .grid-row .stock-tn {
+      text-align: center; font-size: 13px; color: #7b1fa2; font-weight: 600;
+    }
+    .grid-header .col-tn { color: #7b1fa2; }
+    .grid-row input[type="number"] {
+      width: 100%; padding: 8px 4px; border: 2px solid #ddd; border-radius: 8px;
+      font-size: 15px; text-align: center; outline: none; -webkit-appearance: none;
+      appearance: none; transition: border-color 0.2s;
+    }
+    .grid-row input[type="number"]:focus { border-color: #1976d2; }
+    .grid-row.changed input[type="number"] { border-color: #ff9800; background: #fff8e1; }
+    .grid-loading { text-align: center; padding: 20px; color: #888; font-size: 14px; }
+
+    /* Botones */
+    .btn-add {
+      width: 100%; padding: 14px; background: #43a047; color: white; border: none;
+      border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer;
+      transition: background 0.2s; margin-top: 14px; -webkit-appearance: none;
+    }
+    .btn-add:active { background: #388e3c; }
+    .btn-add:disabled { background: #bbb; cursor: not-allowed; }
+    .btn-submit {
+      width: 100%; padding: 14px; background: #1976d2; color: white; border: none;
+      border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer;
+      transition: background 0.2s; margin-top: 8px; -webkit-appearance: none;
+    }
+    .btn-submit:active { background: #1565c0; }
+    .btn-submit:disabled { background: #bbb; cursor: not-allowed; }
+
+    /* Cola */
+    .queue-section { margin-top: 20px; display: none; }
+    .queue-section.active { display: block; }
+    .queue-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .queue-header h2 { font-size: 16px; color: #333; }
+    .queue-count { background: #1976d2; color: white; border-radius: 20px; padding: 2px 10px; font-size: 13px; font-weight: 600; }
+    .queue-item {
+      background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 10px;
+      padding: 10px 14px; margin-bottom: 8px; font-size: 13px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .queue-item-info { flex: 1; }
+    .queue-item-sku { font-weight: 700; color: #1976d2; }
+    .queue-item-detail { color: #666; margin-top: 2px; }
+    .queue-item-badge {
+      font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 6px;
+      margin: 0 8px; white-space: nowrap;
+    }
+    .badge-local { background: #e3f2fd; color: #1565c0; }
+    .badge-deposito { background: #fce4ec; color: #c62828; }
+    .btn-remove { background: none; border: none; color: #999; font-size: 20px; cursor: pointer; padding: 4px 8px; line-height: 1; }
+    .btn-remove:hover { color: #c62828; }
+    .btn-clear-all { background: none; border: none; color: #c62828; font-size: 13px; cursor: pointer; text-decoration: underline; padding: 0; }
+
+    .separator { border: none; border-top: 2px dashed #ddd; margin: 20px 0; }
+
+    /* Messages */
+    .message { padding: 14px; border-radius: 10px; margin-top: 12px; font-size: 14px; display: none; }
+    .message.success { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; display: block; }
+    .message.error { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; display: block; }
+
+    /* Loading */
+    .loading { text-align: center; padding: 40px; color: #666; }
+    .spinner { display: inline-block; width: 32px; height: 32px; border: 3px solid #ddd; border-top-color: #1976d2; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .nav-links { text-align: center; margin-top: 20px; padding-top: 14px; border-top: 1px solid #eee; }
+    .nav-links a { color: #1976d2; text-decoration: none; font-size: 13px; margin: 0 8px; }
+
+    @media (max-width: 400px) { .container { padding: 16px; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Actualizar Stock</h1>
+      <p>Tu Textil — por ubicacion</p>
+    </div>
+
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>Cargando productos...</p>
+    </div>
+
+    <div id="formContainer" style="display:none;">
+      <!-- Empleado -->
+      <div class="form-group">
+        <label class="field-label">Empleado <span class="required">*</span></label>
+        <select id="empleado">
+          <option value="">Selecciona tu nombre</option>
+          <option value="Elio">Elio</option>
+          <option value="Claudio">Claudio</option>
+          <option value="Willy">Willy</option>
+          <option value="Luis">Luis</option>
+          <option value="Laura">Laura</option>
+          <option value="Romina">Romina</option>
+          <option value="Fabiana">Fabiana</option>
+          <option value="Manuel">Manuel</option>
+          <option value="Sergio">Sergio</option>
+          <option value="Marina">Marina</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
+
+      <!-- Ubicacion -->
+      <div class="form-group">
+        <label class="field-label">Ubicacion <span class="required">*</span></label>
+        <div class="radio-group cols-2">
+          <div class="radio-card">
+            <input type="radio" name="ubicacion" id="ubicLocal" value="Local">
+            <label for="ubicLocal"><span class="icon">🏪</span>Local</label>
+          </div>
+          <div class="radio-card">
+            <input type="radio" name="ubicacion" id="ubicDeposito" value="Deposito">
+            <label for="ubicDeposito"><span class="icon">🏭</span>Deposito</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Producto -->
+      <div class="form-group">
+        <label class="field-label">Producto <span class="required">*</span></label>
+        <div id="skuSearchContainer" class="search-container">
+          <input type="text" id="skuSearch" class="search-input" placeholder="SKU o nombre del producto..." autocomplete="off">
+          <div id="searchResults" class="search-results"></div>
+        </div>
+        <div id="skuSelected" class="selected-sku" style="display:none;">
+          <div class="sku-info">
+            <span class="sku-code" id="selectedSkuCode"></span><br>
+            <span class="sku-name" id="selectedSkuName"></span>
+          </div>
+          <button class="btn-clear" onclick="clearSku()" title="Cambiar">&times;</button>
+        </div>
+      </div>
+
+      <!-- Grilla de variantes -->
+      <div id="gridSection" class="grid-section" style="display:none;">
+        <div class="grid-container">
+          <div class="grid-header">
+            <span>Variante</span>
+            <span id="colLocal">🏪 Local</span>
+            <span id="colDeposito">🏭 Depo</span>
+            <span class="col-tn">🌐 TN</span>
+          </div>
+          <div id="gridBody"></div>
+        </div>
+        <button class="btn-add" id="btnAgregar" onclick="agregarACola()">+ Agregar cambios</button>
+      </div>
+
+      <!-- Cola -->
+      <div class="queue-section" id="queueSection">
+        <hr class="separator">
+        <div class="queue-header">
+          <h2>Cambios pendientes</h2>
+          <span class="queue-count" id="queueCount">0</span>
+        </div>
+        <div id="queueList"></div>
+        <div style="display:flex; gap:8px; align-items:center; justify-content:space-between; margin-bottom:8px;">
+          <button class="btn-clear-all" onclick="vaciarCola()">Vaciar lista</button>
+        </div>
+        <button class="btn-submit" id="btnEnviar" onclick="enviarTodos()">Registrar todo</button>
+      </div>
+
+      <div id="mensaje" class="message"></div>
+
+      <div class="nav-links">
+        <a href="?page=formulario">Carga clasica</a>
+        <a href="?page=consultar">Consultar stock</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var allProductos = [];
+    var selectedSku = null;
+    var selectedNombre = null;
+    var highlightedIndex = -1;
+    var variantesActuales = [];
+    var valoresOriginales = {};
+    var cola = [];
+
+    // ========== INICIALIZACION ==========
+    window.onload = function() {
+      google.script.run
+        .withSuccessHandler(function(productos) {
+          allProductos = productos;
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('formContainer').style.display = 'block';
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('loading').innerHTML =
+            '<p style="color:#c62828;font-weight:600;">⚠️ Error al cargar productos</p>' +
+            '<p style="color:#c62828;font-size:13px;margin-top:8px;">' + (error.message || error) + '</p>' +
+            '<button onclick="window.location.reload()" style="margin-top:16px;padding:10px 24px;background:#1976d2;color:white;border:none;border-radius:10px;font-size:15px;cursor:pointer;">🔄 Reintentar</button>';
+        })
+        .getProductos();
+    };
+
+    // ========== BUSCADOR DE PRODUCTOS ==========
+    var searchInput = document.getElementById('skuSearch');
+    var searchResults = document.getElementById('searchResults');
+
+    searchInput.addEventListener('input', function() {
+      var query = this.value.trim().toLowerCase();
+      highlightedIndex = -1;
+      if (query.length < 1) { searchResults.classList.remove('visible'); return; }
+      var matches = allProductos.filter(function(item) {
+        return item.sku.toLowerCase().indexOf(query) !== -1 || item.nombre.toLowerCase().indexOf(query) !== -1;
+      }).slice(0, 20);
+      if (matches.length === 0) {
+        searchResults.innerHTML = '<div class="search-result-item" style="color:#999;">No se encontraron resultados</div>';
+      } else {
+        searchResults.innerHTML = matches.map(function(item, index) {
+          var skuSafe = item.sku.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+          var nombreSafe = item.nombre.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+          return '<div class="search-result-item" data-index="' + index + '" ' +
+            'onclick="selectProducto(\'' + skuSafe + '\', \'' + nombreSafe + '\')">' +
+            '<span class="sku-code">' + item.sku + '</span>' +
+            '<span class="sku-name">' + item.nombre + '</span></div>';
+        }).join('');
+      }
+      searchResults.classList.add('visible');
+    });
+
+    searchInput.addEventListener('keydown', function(e) {
+      var items = searchResults.querySelectorAll('.search-result-item[data-index]');
+      if (!items.length) return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); highlightedIndex = Math.min(highlightedIndex + 1, items.length - 1); updateHighlight(items); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); highlightedIndex = Math.max(highlightedIndex - 1, 0); updateHighlight(items); }
+      else if (e.key === 'Enter' && highlightedIndex >= 0) { e.preventDefault(); items[highlightedIndex].click(); }
+    });
+
+    function updateHighlight(items) {
+      items.forEach(function(item, i) { item.classList.toggle('highlighted', i === highlightedIndex); });
+      if (highlightedIndex >= 0) items[highlightedIndex].scrollIntoView({ block: 'nearest' });
+    }
+
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.search-container')) searchResults.classList.remove('visible');
+    });
+
+    // ========== SELECCION DE PRODUCTO ==========
+    function selectProducto(sku, nombre) {
+      // Validar que haya ubicacion seleccionada
+      var ubicacion = document.querySelector('input[name="ubicacion"]:checked');
+      if (!ubicacion) {
+        mostrarMensaje('Primero selecciona la ubicacion (Local o Deposito)', 'error');
+        return;
+      }
+
+      selectedSku = sku;
+      selectedNombre = nombre;
+      document.getElementById('skuSearchContainer').style.display = 'none';
+      document.getElementById('skuSelected').style.display = 'flex';
+      document.getElementById('selectedSkuCode').textContent = sku;
+      document.getElementById('selectedSkuName').textContent = nombre;
+
+      // Cargar grilla
+      var gridBody = document.getElementById('gridBody');
+      gridBody.innerHTML = '<div class="grid-loading"><div class="spinner"></div><br>Cargando variantes...</div>';
+      document.getElementById('gridSection').style.display = 'block';
+      document.getElementById('btnAgregar').disabled = true;
+
+      actualizarHeadersGrilla();
+
+      google.script.run
+        .withSuccessHandler(function(variantes) {
+          variantesActuales = variantes;
+          renderGrilla(variantes);
+          document.getElementById('btnAgregar').disabled = false;
+        })
+        .withFailureHandler(function(error) {
+          gridBody.innerHTML = '<div class="grid-loading" style="color:#c62828;">Error: ' + error.message + '</div>';
+        })
+        .getVariantesConStock(sku, nombre);
+    }
+
+    function actualizarHeadersGrilla() {
+      var ubicacion = document.querySelector('input[name="ubicacion"]:checked');
+      var miUbic = ubicacion ? ubicacion.value : 'Local';
+      var colLocal = document.getElementById('colLocal');
+      var colDeposito = document.getElementById('colDeposito');
+      colLocal.className = miUbic === 'Local' ? 'col-active' : '';
+      colDeposito.className = miUbic === 'Deposito' ? 'col-active' : '';
+    }
+
+    function renderGrilla(variantes) {
+      var gridBody = document.getElementById('gridBody');
+      var ubicacion = document.querySelector('input[name="ubicacion"]:checked');
+      var miUbic = ubicacion ? ubicacion.value : 'Local';
+
+      valoresOriginales = {};
+      var html = '';
+
+      for (var i = 0; i < variantes.length; i++) {
+        var v = variantes[i];
+        valoresOriginales[i] = miUbic === 'Local' ? v.stockLocal : v.stockDeposito;
+        var tnStock = v.stockTiendaNube !== null && v.stockTiendaNube !== undefined ? v.stockTiendaNube : '-';
+
+        if (miUbic === 'Local') {
+          html += '<div class="grid-row" id="row-' + i + '">' +
+            '<span class="variante-name">' + escapeHtml(v.variante) + '</span>' +
+            '<input type="number" id="stock-' + i + '" value="' + v.stockLocal + '" min="0" inputmode="numeric" onchange="marcarCambio(' + i + ')" oninput="marcarCambio(' + i + ')">' +
+            '<span class="stock-other">' + v.stockDeposito + '</span>' +
+            '<span class="stock-tn">' + tnStock + '</span>' +
+            '</div>';
+        } else {
+          html += '<div class="grid-row" id="row-' + i + '">' +
+            '<span class="variante-name">' + escapeHtml(v.variante) + '</span>' +
+            '<span class="stock-other">' + v.stockLocal + '</span>' +
+            '<input type="number" id="stock-' + i + '" value="' + v.stockDeposito + '" min="0" inputmode="numeric" onchange="marcarCambio(' + i + ')" oninput="marcarCambio(' + i + ')">' +
+            '<span class="stock-tn">' + tnStock + '</span>' +
+            '</div>';
+        }
+      }
+
+      if (variantes.length === 0) {
+        html = '<div class="grid-loading">No se encontraron variantes para este producto</div>';
+      }
+
+      gridBody.innerHTML = html;
+    }
+
+    function marcarCambio(index) {
+      var input = document.getElementById('stock-' + index);
+      var row = document.getElementById('row-' + index);
+      var valorActual = parseInt(input.value);
+      var valorOriginal = valoresOriginales[index];
+
+      if (valorActual !== valorOriginal && input.value !== '') {
+        row.classList.add('changed');
+      } else {
+        row.classList.remove('changed');
+      }
+    }
+
+    function clearSku() {
+      selectedSku = null;
+      selectedNombre = null;
+      variantesActuales = [];
+      valoresOriginales = {};
+      document.getElementById('skuSearchContainer').style.display = 'block';
+      document.getElementById('skuSelected').style.display = 'none';
+      document.getElementById('skuSearch').value = '';
+      document.getElementById('gridSection').style.display = 'none';
+      searchResults.classList.remove('visible');
+      document.getElementById('skuSearch').focus();
+    }
+
+    // ========== COLA DE CAMBIOS ==========
+    function agregarACola() {
+      var empleado = document.getElementById('empleado').value;
+      var ubicacion = document.querySelector('input[name="ubicacion"]:checked');
+      var errores = [];
+      if (!empleado) errores.push('Selecciona tu nombre');
+      if (!ubicacion) errores.push('Selecciona la ubicacion');
+      if (!selectedSku) errores.push('Selecciona un producto');
+      if (errores.length > 0) { mostrarMensaje(errores.join(' | '), 'error'); return; }
+
+      // Recolectar todas las filas con valor (siempre manda a TN aunque no haya cambio)
+      var cambios = [];
+      for (var i = 0; i < variantesActuales.length; i++) {
+        var input = document.getElementById('stock-' + i);
+        if (input.value !== '') {
+          cambios.push({
+            variante: variantesActuales[i].variante,
+            stockNuevo: parseInt(input.value)
+          });
+        }
+      }
+
+      if (cambios.length === 0) {
+        mostrarMensaje('Completa al menos una cantidad.', 'error');
+        return;
+      }
+
+      cola.push({
+        empleado: empleado,
+        sku: selectedSku,
+        nombre: selectedNombre,
+        ubicacion: ubicacion.value,
+        cambios: cambios
+      });
+
+      clearSku();
+      renderCola();
+      mostrarMensaje(cambios.length + ' variante' + (cambios.length !== 1 ? 's' : '') + ' agregada' + (cambios.length !== 1 ? 's' : '') + ' a la lista', 'success');
+    }
+
+    function eliminarDeCola(index) {
+      cola.splice(index, 1);
+      renderCola();
+    }
+
+    function vaciarCola() {
+      if (cola.length > 0 && !confirm('Seguro que queres vaciar la lista?')) return;
+      cola = [];
+      renderCola();
+    }
+
+    function renderCola() {
+      var section = document.getElementById('queueSection');
+      var list = document.getElementById('queueList');
+      var count = document.getElementById('queueCount');
+
+      if (cola.length === 0) {
+        section.classList.remove('active');
+        return;
+      }
+
+      section.classList.add('active');
+      var totalCambios = 0;
+      cola.forEach(function(item) { totalCambios += item.cambios.length; });
+      count.textContent = totalCambios;
+
+      list.innerHTML = cola.map(function(item, index) {
+        var badgeClass = item.ubicacion === 'Local' ? 'badge-local' : 'badge-deposito';
+        var ubicIcon = item.ubicacion === 'Local' ? '🏪' : '🏭';
+        var detalles = item.cambios.map(function(c) {
+          return c.variante + ': ' + c.stockNuevo;
+        }).join(' | ');
+
+        return '<div class="queue-item">' +
+          '<div class="queue-item-info">' +
+            '<div class="queue-item-sku">' + escapeHtml(item.sku) + '</div>' +
+            '<div class="queue-item-detail">' + escapeHtml(detalles) + '</div>' +
+          '</div>' +
+          '<span class="queue-item-badge ' + badgeClass + '">' + ubicIcon + ' ' + item.ubicacion + '</span>' +
+          '<button class="btn-remove" onclick="eliminarDeCola(' + index + ')" title="Quitar">&times;</button>' +
+        '</div>';
+      }).join('');
+    }
+
+    function enviarTodos() {
+      if (cola.length === 0) {
+        mostrarMensaje('No hay cambios para registrar', 'error');
+        return;
+      }
+
+      var btn = document.getElementById('btnEnviar');
+      btn.disabled = true;
+      btn.textContent = 'Guardando...';
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          mostrarMensaje(result.message, 'success');
+          btn.disabled = false;
+          btn.textContent = 'Registrar todo';
+          cola = [];
+          renderCola();
+        })
+        .withFailureHandler(function(error) {
+          mostrarMensaje('Error: ' + error.message, 'error');
+          btn.disabled = false;
+          btn.textContent = 'Registrar todo';
+        })
+        .guardarMultiplesCambiosV2(cola);
+    }
+
+    // ========== UTILIDADES ==========
+    function mostrarMensaje(texto, tipo) {
+      var msg = document.getElementById('mensaje');
+      msg.textContent = texto;
+      msg.className = 'message ' + tipo;
+      if (tipo === 'success') setTimeout(function() { msg.className = 'message'; }, 3000);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // Cuando cambia la ubicacion, recargar grilla si hay producto seleccionado
+    document.querySelectorAll('input[name="ubicacion"]').forEach(function(radio) {
+      radio.addEventListener('change', function() {
+        if (selectedSku && variantesActuales.length > 0) {
+          actualizarHeadersGrilla();
+          renderGrilla(variantesActuales);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+# Credenciales y tokens - NUNCA subir
+data/
+
+# Imágenes y archivos grandes
+fotos/
+
+# Archivos temporales
+apps/stock-form/Code.gs.tmp
+*.tmp
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Google Ads - datos descargados (reportes CSV)
+google-ads/data/
+google-ads/reports/
+
+# Claude interno
+.claude/
+
+# Windows
+Thumbs.db
+desktop.ini

@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+      background: #f0f2f5; min-height: 100vh; min-height: 100dvh;
+      display: flex; justify-content: center; padding: 12px;
+    }
+    .container {
+      background: white; border-radius: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+      padding: 24px; max-width: 540px; width: 100%; height: fit-content;
+    }
+    .header { text-align: center; margin-bottom: 24px; }
+    .header h1 { color: #1a1a1a; font-size: 20px; margin-bottom: 2px; }
+    .header p { color: #888; font-size: 13px; }
+
+    /* Search */
+    .search-container { position: relative; }
+    .search-input {
+      width: 100%; padding: 12px 14px; border: 2px solid #ddd; border-radius: 10px;
+      font-size: 16px; transition: border-color 0.2s; outline: none; -webkit-appearance: none;
+    }
+    .search-input:focus { border-color: #1976d2; }
+    .search-results {
+      position: absolute; top: 100%; left: 0; right: 0; background: white;
+      border: 2px solid #1976d2; border-top: none; border-radius: 0 0 10px 10px;
+      max-height: 220px; overflow-y: auto; z-index: 100; display: none; -webkit-overflow-scrolling: touch;
+    }
+    .search-results.visible { display: block; }
+    .search-result-item { padding: 12px 14px; cursor: pointer; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+    .search-result-item:active, .search-result-item.highlighted { background: #e8f4fd; }
+    .search-result-item .sku-code { font-weight: 700; color: #1976d2; }
+    .search-result-item .sku-name { color: #666; font-size: 13px; display: block; margin-top: 2px; }
+
+    /* Selected SKU */
+    .selected-sku {
+      background: #e8f5e9; border: 2px solid #4caf50; border-radius: 10px;
+      padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; font-size: 14px;
+    }
+    .selected-sku .sku-info { flex: 1; }
+    .selected-sku .sku-code { font-weight: 700; color: #2e7d32; }
+    .selected-sku .sku-name { color: #666; font-size: 13px; }
+    .btn-clear { background: none; border: none; color: #999; font-size: 22px; cursor: pointer; padding: 4px 8px; border-radius: 6px; line-height: 1; }
+
+    /* Grilla de variantes */
+    .grid-section { margin-top: 16px; }
+    .grid-container {
+      border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden;
+    }
+    .grid-container { overflow-x: auto; }
+    .grid-header {
+      display: grid; grid-template-columns: 1fr 48px 48px 44px 68px;
+      gap: 4px; padding: 8px 10px; background: #f8f9fa;
+      font-size: 11px; font-weight: 600; color: #666; text-transform: uppercase;
+      min-width: 480px;
+    }
+    .grid-header span:not(:first-child) { text-align: center; }
+    .grid-row {
+      display: grid; grid-template-columns: 1fr 48px 48px 44px 68px;
+      gap: 4px; padding: 9px 10px; border-bottom: 1px solid #f0f0f0;
+      align-items: center; min-width: 480px;
+    }
+    .grid-row:last-child { border-bottom: none; }
+    .grid-row:nth-child(even) { background: #fafafa; }
+    .grid-row .variante-name { font-size: 14px; color: #333; }
+    .grid-row .stock-cell {
+      text-align: center; font-size: 15px; font-weight: 600;
+    }
+    .stock-cell.local { color: #1565c0; }
+    .stock-cell.deposito { color: #e65100; }
+    .stock-cell.tn { color: #7b1fa2; }
+    .stock-cell.full { color: #2e7d32; }
+    .stock-cell.zero { opacity: 0.4; }
+    .stock-cell.falta-vincular {
+      color: #c62828; font-size: 9px; font-weight: 600; line-height: 1.1;
+      text-transform: uppercase;
+    }
+    .col-local { color: #1565c0; }
+    .col-deposito { color: #e65100; }
+    .col-tn { color: #7b1fa2; }
+    .col-full { color: #2e7d32; }
+    .grid-loading { text-align: center; padding: 20px; color: #888; font-size: 14px; }
+
+    /* Historial */
+    .historial-section { margin-top: 20px; }
+    .historial-container {
+      border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden;
+    }
+    .historial-header-bar {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 14px; background: #f8f9fa; border-bottom: 1px solid #e0e0e0;
+    }
+    .historial-header-bar h3 { font-size: 14px; color: #333; font-weight: 600; }
+    .historial-count {
+      background: #1976d2; color: white; border-radius: 20px;
+      padding: 2px 10px; font-size: 12px; font-weight: 600;
+    }
+    .historial-row {
+      padding: 10px 14px; border-bottom: 1px solid #f0f0f0; font-size: 13px;
+      display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center;
+    }
+    .historial-row:last-child { border-bottom: none; }
+    .historial-row:nth-child(even) { background: #fafafa; }
+    .hist-fecha { color: #888; font-size: 12px; min-width: 110px; }
+    .hist-empleado { font-weight: 600; color: #333; }
+    .hist-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      font-size: 11px; font-weight: 600;
+    }
+    .hist-badge.ingreso { background: #e8f5e9; color: #2e7d32; }
+    .hist-badge.vendido { background: #ffebee; color: #c62828; }
+    .hist-badge.actualizacion { background: #e3f2fd; color: #1565c0; }
+    .hist-badge.full { background: #fff3e0; color: #e65100; }
+    .hist-cantidad { font-weight: 700; color: #333; }
+    .hist-ubicacion { color: #888; font-size: 12px; }
+    .hist-variante { color: #999; font-size: 12px; }
+    .hist-comentario { color: #999; font-size: 12px; font-style: italic; width: 100%; }
+    .no-historial { padding: 20px; text-align: center; color: #999; font-size: 13px; }
+    #historialLimite {
+      padding: 4px 8px; border: 1px solid #ddd; border-radius: 6px;
+      font-size: 13px; outline: none; cursor: pointer;
+    }
+
+    /* Loading */
+    .loading { text-align: center; padding: 40px; color: #666; display: none; }
+    .loading.active { display: block; }
+    .spinner { display: inline-block; width: 32px; height: 32px; border: 3px solid #ddd; border-top-color: #1976d2; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .nav-links { text-align: center; margin-top: 20px; padding-top: 14px; border-top: 1px solid #eee; }
+    .nav-links a { color: #1976d2; text-decoration: none; font-size: 13px; margin: 0 8px; }
+
+    @media (max-width: 400px) { .container { padding: 16px; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Consultar Stock</h1>
+      <p>Tu Textil — Local, Deposito y TiendaNube</p>
+    </div>
+
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>Cargando productos...</p>
+    </div>
+
+    <div id="formContainer" style="display:none;">
+      <!-- Buscador -->
+      <div class="search-container" id="skuSearchContainer">
+        <input type="text" id="skuSearch" class="search-input" placeholder="SKU o nombre del producto..." autocomplete="off" autofocus>
+        <div id="searchResults" class="search-results"></div>
+      </div>
+
+      <!-- SKU seleccionado -->
+      <div id="skuSelected" class="selected-sku" style="display:none;">
+        <div class="sku-info">
+          <span class="sku-code" id="selectedSkuCode"></span><br>
+          <span class="sku-name" id="selectedSkuName"></span>
+        </div>
+        <button class="btn-clear" onclick="clearSku()" title="Cambiar">&times;</button>
+      </div>
+
+      <!-- Grilla de stock (solo lectura) -->
+      <div id="gridSection" class="grid-section" style="display:none;">
+        <div class="grid-container">
+          <div class="grid-header">
+            <span>Variante</span>
+            <span class="col-local">🏪 Local</span>
+            <span class="col-deposito">🏭 Depo</span>
+            <span class="col-tn">🛒 TN</span>
+            <span class="col-full">📦 Full</span>
+          </div>
+          <div id="gridBody"></div>
+        </div>
+      </div>
+
+      <!-- Historial -->
+      <div id="historialSection" class="historial-section" style="display:none;">
+        <div class="historial-container">
+          <div class="historial-header-bar">
+            <h3>Ultimos movimientos</h3>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <select id="historialLimite" onchange="cargarHistorial()">
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+              </select>
+              <span class="historial-count" id="historialCount">0</span>
+            </div>
+          </div>
+          <div id="historialBody"></div>
+        </div>
+      </div>
+
+      <div class="nav-links">
+        <a href="?page=formulario">Carga clasica</a>
+        <a href="?page=actualizar">Actualizar TiendaNube</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var allProductos = [];
+    var highlightedIndex = -1;
+    var selectedSku = null;
+    var selectedNombre = null;
+
+    // ========== INICIALIZACION ==========
+    window.onload = function() {
+      document.getElementById('loading').style.display = 'block';
+      google.script.run
+        .withSuccessHandler(function(productos) {
+          allProductos = productos;
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('formContainer').style.display = 'block';
+        })
+        .getProductos();
+    };
+
+    // ========== BUSCADOR ==========
+    var searchInput = document.getElementById('skuSearch');
+    var searchResults = document.getElementById('searchResults');
+
+    searchInput.addEventListener('input', function() {
+      var query = this.value.trim().toLowerCase();
+      highlightedIndex = -1;
+      if (query.length < 1) { searchResults.classList.remove('visible'); return; }
+      var matches = allProductos.filter(function(item) {
+        return item.sku.toLowerCase().indexOf(query) !== -1 || item.nombre.toLowerCase().indexOf(query) !== -1;
+      }).slice(0, 20);
+      if (matches.length === 0) {
+        searchResults.innerHTML = '<div class="search-result-item" style="color:#999;">No se encontraron resultados</div>';
+      } else {
+        searchResults.innerHTML = matches.map(function(item, index) {
+          var skuSafe = item.sku.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+          var nombreSafe = item.nombre.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+          return '<div class="search-result-item" data-index="' + index + '" ' +
+            'onclick="selectProducto(\'' + skuSafe + '\', \'' + nombreSafe + '\')">' +
+            '<span class="sku-code">' + escapeHtml(item.sku) + '</span>' +
+            '<span class="sku-name">' + escapeHtml(item.nombre) + '</span></div>';
+        }).join('');
+      }
+      searchResults.classList.add('visible');
+    });
+
+    searchInput.addEventListener('keydown', function(e) {
+      var items = searchResults.querySelectorAll('.search-result-item[data-index]');
+      if (!items.length) return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); highlightedIndex = Math.min(highlightedIndex + 1, items.length - 1); updateHighlight(items); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); highlightedIndex = Math.max(highlightedIndex - 1, 0); updateHighlight(items); }
+      else if (e.key === 'Enter' && highlightedIndex >= 0) { e.preventDefault(); items[highlightedIndex].click(); }
+    });
+
+    function updateHighlight(items) {
+      items.forEach(function(item, i) { item.classList.toggle('highlighted', i === highlightedIndex); });
+      if (highlightedIndex >= 0) items[highlightedIndex].scrollIntoView({ block: 'nearest' });
+    }
+
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.search-container')) searchResults.classList.remove('visible');
+    });
+
+    // ========== SELECCION ==========
+    function selectProducto(sku, nombre) {
+      selectedSku = sku;
+      selectedNombre = nombre;
+      document.getElementById('skuSearchContainer').style.display = 'none';
+      document.getElementById('skuSelected').style.display = 'flex';
+      document.getElementById('selectedSkuCode').textContent = sku;
+      document.getElementById('selectedSkuName').textContent = nombre;
+
+      // Cargar grilla
+      var gridBody = document.getElementById('gridBody');
+      gridBody.innerHTML = '<div class="grid-loading"><div class="spinner"></div><br>Consultando stock...</div>';
+      document.getElementById('gridSection').style.display = 'block';
+      document.getElementById('historialSection').style.display = 'none';
+
+      google.script.run
+        .withSuccessHandler(function(variantes) {
+          renderGrilla(variantes);
+        })
+        .withFailureHandler(function(error) {
+          gridBody.innerHTML = '<div class="grid-loading" style="color:#c62828;">Error: ' + escapeHtml(error.message) + '</div>';
+        })
+        .getVariantesConStock(sku, nombre);
+
+      // Cargar historial
+      document.getElementById('historialLimite').value = '10';
+      cargarHistorial();
+    }
+
+    function clearSku() {
+      selectedSku = null;
+      selectedNombre = null;
+      document.getElementById('skuSearchContainer').style.display = 'block';
+      document.getElementById('skuSelected').style.display = 'none';
+      document.getElementById('skuSearch').value = '';
+      document.getElementById('gridSection').style.display = 'none';
+      document.getElementById('historialSection').style.display = 'none';
+      searchResults.classList.remove('visible');
+      document.getElementById('skuSearch').focus();
+    }
+
+    // ========== HISTORIAL ==========
+    function cargarHistorial() {
+      if (!selectedSku) return;
+      var limite = parseInt(document.getElementById('historialLimite').value) || 10;
+      var body = document.getElementById('historialBody');
+      body.innerHTML = '<div class="no-historial"><div class="spinner"></div></div>';
+      document.getElementById('historialSection').style.display = 'block';
+
+      google.script.run
+        .withSuccessHandler(function(data) {
+          renderHistorial(data);
+        })
+        .withFailureHandler(function(error) {
+          body.innerHTML = '<div class="no-historial">Error cargando historial</div>';
+        })
+        .obtenerHistorialSKU(selectedSku, limite);
+    }
+
+    // ========== GRILLA (solo lectura) ==========
+    function renderGrilla(variantes) {
+      var gridBody = document.getElementById('gridBody');
+
+      if (!variantes || variantes.length === 0) {
+        gridBody.innerHTML = '<div class="grid-loading">No se encontraron variantes</div>';
+        return;
+      }
+
+      var html = '';
+      for (var i = 0; i < variantes.length; i++) {
+        var v = variantes[i];
+        var local = v.stockLocal || 0;
+        var depo = v.stockDeposito || 0;
+        var tn = v.stockTiendaNube !== null && v.stockTiendaNube !== undefined ? v.stockTiendaNube : '-';
+
+        // Stock Full: puede ser número, 'FALTA_VINCULAR' o undefined
+        var fullHtml;
+        if (v.stockFull === 'FALTA_VINCULAR' || v.stockFull === undefined || v.stockFull === null) {
+          fullHtml = '<span class="stock-cell falta-vincular" title="No hay stock en Full">No hay en Full</span>';
+        } else {
+          var fullNum = parseInt(v.stockFull) || 0;
+          fullHtml = '<span class="stock-cell full' + (fullNum === 0 ? ' zero' : '') + '">' + fullNum + '</span>';
+        }
+
+
+        html += '<div class="grid-row">';
+        html += '<span class="variante-name">' + escapeHtml(v.variante) + '</span>';
+        html += '<span class="stock-cell local' + (local === 0 ? ' zero' : '') + '">' + local + '</span>';
+        html += '<span class="stock-cell deposito' + (depo === 0 ? ' zero' : '') + '">' + depo + '</span>';
+        html += '<span class="stock-cell tn' + (tn === 0 ? ' zero' : '') + '">' + tn + '</span>';
+        html += fullHtml;
+        html += '</div>';
+      }
+
+      gridBody.innerHTML = html;
+    }
+
+    // ========== HISTORIAL ==========
+    function renderHistorial(movimientos) {
+      var body = document.getElementById('historialBody');
+      var count = document.getElementById('historialCount');
+      var section = document.getElementById('historialSection');
+
+      if (!movimientos || movimientos.length === 0) {
+        body.innerHTML = '<div class="no-historial">Sin movimientos registrados</div>';
+        count.textContent = '0';
+        section.style.display = 'block';
+        return;
+      }
+
+      count.textContent = movimientos.length;
+
+      var html = '';
+      for (var i = 0; i < movimientos.length; i++) {
+        var m = movimientos[i];
+        var tipoClass = m.tipo.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+        html += '<div class="historial-row">';
+        html += '<span class="hist-fecha">' + escapeHtml(m.fecha) + '</span>';
+        html += '<span class="hist-empleado">' + escapeHtml(m.empleado) + '</span>';
+        html += '<span class="hist-badge ' + escapeHtml(tipoClass) + '">' + escapeHtml(m.tipo) + '</span>';
+        // Detalle: variante + cantidad (ej: "Azul 7 unidades")
+        var detalle = '';
+        if (m.variante && m.variante !== '(Sin variante)') detalle += m.variante + ' ';
+        detalle += m.cantidad + ' u.';
+        html += '<span class="hist-cantidad">' + escapeHtml(detalle) + '</span>';
+        html += '<span class="hist-ubicacion">' + escapeHtml(m.ubicacion) + '</span>';
+        if (m.comentarios) {
+          html += '<span class="hist-comentario">' + escapeHtml(m.comentarios) + '</span>';
+        }
+        html += '</div>';
+      }
+
+      body.innerHTML = html;
+      section.style.display = 'block';
+    }
+
+    // ========== UTILIDADES ==========
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+  </script>
+</body>
+</html>

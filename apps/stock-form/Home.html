@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+      background: #f0f2f5; min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 20px 12px 40px;
+    }
+
+    .header {
+      text-align: center; margin-bottom: 28px;
+    }
+    .header h1 {
+      font-size: 26px; font-weight: 700; color: #1a1a1a; margin-bottom: 4px;
+    }
+    .header p {
+      font-size: 14px; color: #888;
+    }
+    .logo {
+      font-size: 36px; margin-bottom: 8px;
+    }
+
+    .section {
+      width: 100%; max-width: 520px; margin-bottom: 20px;
+    }
+    .section-title {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: #aaa;
+      margin-bottom: 10px; padding-left: 4px;
+    }
+
+    .cards {
+      display: flex; flex-direction: column; gap: 10px;
+    }
+
+    .card {
+      background: white; border-radius: 14px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+      padding: 16px 18px;
+      display: flex; align-items: center; gap: 14px;
+      text-decoration: none; color: inherit;
+      transition: box-shadow 0.15s, transform 0.1s;
+      cursor: pointer; border: 2px solid transparent;
+    }
+    .card:active {
+      transform: scale(0.98);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .card:hover {
+      box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+    }
+
+    .card-icon {
+      font-size: 28px; width: 46px; height: 46px;
+      border-radius: 12px; display: flex; align-items: center;
+      justify-content: center; flex-shrink: 0;
+    }
+    .card-text { flex: 1; }
+    .card-title {
+      font-size: 15px; font-weight: 600; color: #1a1a1a; margin-bottom: 2px;
+    }
+    .card-desc {
+      font-size: 12px; color: #888; line-height: 1.4;
+    }
+    .card-arrow {
+      font-size: 18px; color: #ccc; flex-shrink: 0;
+    }
+
+    /* Colores por sección */
+    .card.tiendanube .card-icon { background: #e8f5e9; }
+    .card.meli       .card-icon { background: #fff3e0; }
+    .card.admin      .card-icon { background: #f3e5f5; }
+    .card.external   .card-icon { background: #e3f2fd; }
+
+    .card.tiendanube { border-color: transparent; }
+    .card.meli       { border-color: transparent; }
+
+    /* Badge "externo" */
+    .badge-ext {
+      font-size: 10px; background: #f0f0f0; color: #999;
+      border-radius: 6px; padding: 2px 6px; margin-left: 6px;
+      font-weight: 600; vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="logo">🧵</div>
+    <h1>Tu Textil</h1>
+    <p>Panel de herramientas</p>
+  </div>
+
+  <!-- TIENDANUBE -->
+  <div class="section">
+    <div class="section-title">TiendaNube</div>
+    <div class="cards">
+
+      <a class="card tiendanube" id="link-consultar">
+        <div class="card-icon">🔍</div>
+        <div class="card-text">
+          <div class="card-title">Consultar Stock</div>
+          <div class="card-desc">Ver stock por variante, local, depósito y Full</div>
+        </div>
+        <div class="card-arrow">›</div>
+      </a>
+
+      <a class="card tiendanube" id="link-formulariov2">
+        <div class="card-icon">📦</div>
+        <div class="card-text">
+          <div class="card-title">Cargar Movimiento</div>
+          <div class="card-desc">Formulario para empleados — ingresos, actualizaciones, ventas</div>
+        </div>
+        <div class="card-arrow">›</div>
+      </a>
+
+    </div>
+  </div>
+
+  <!-- MERCADOLIBRE -->
+  <div class="section">
+    <div class="section-title">MercadoLibre</div>
+    <div class="cards">
+
+      <a class="card meli" id="link-vincular">
+        <div class="card-icon">🔗</div>
+        <div class="card-text">
+          <div class="card-title">Vincular Publicaciones</div>
+          <div class="card-desc">Conectar SKUs de MeLi con productos de TiendaNube</div>
+        </div>
+        <div class="card-arrow">›</div>
+      </a>
+
+
+    </div>
+  </div>
+
+  <!-- ADMINISTRACION -->
+  <div class="section">
+    <div class="section-title">Administración</div>
+    <div class="cards">
+
+      <a class="card external" href="https://docs.google.com/spreadsheets/d/10gyg3GgtGgbUx2HHUmGs6W6v5sIIU3lXBULgs_AL79o/edit" target="_blank">
+        <div class="card-icon">📋</div>
+        <div class="card-text">
+          <div class="card-title">Google Sheet <span class="badge-ext">↗</span></div>
+          <div class="card-desc">Hoja de Productos, Registros y Vinculaciones</div>
+        </div>
+        <div class="card-arrow">›</div>
+      </a>
+
+      <a class="card external" href="https://script.google.com/u/0/home/projects/1PnMzH0fPqtSS8vvWtqieMI9rGK4lRX6DP00a8r9IOJGmQIdr50Y53ayM/edit" target="_blank">
+        <div class="card-icon">⚙️</div>
+        <div class="card-text">
+          <div class="card-title">Editor Apps Script <span class="badge-ext">↗</span></div>
+          <div class="card-desc">Código fuente del proyecto</div>
+        </div>
+        <div class="card-arrow">›</div>
+      </a>
+
+    </div>
+  </div>
+
+  <script>
+    var baseUrl = '<?= baseUrl ?>';
+
+    var links = {
+      'link-consultar':     baseUrl + '?page=consultar',
+      'link-formulariov2':  baseUrl + '?page=formulariov2',
+      'link-actualizar':    baseUrl + '?page=formulariov2',
+      'link-vincular':      baseUrl + '?page=vincular',
+      'link-publicar':      baseUrl + '?page=publicar',
+      'link-consultarmeli': baseUrl + '?page=consultarmeli',
+      'link-mercadolibre':  baseUrl + '?page=mercadolibre'
+    };
+
+    Object.keys(links).forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) {
+        el.href = links[id];
+        el.onclick = function(e) {
+          e.preventDefault();
+          window.top.location.href = links[id];
+        };
+      }
+    });
+  </script>
+
+</body>
+</html>

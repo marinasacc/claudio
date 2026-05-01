@@ -1,0 +1,1452 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      padding: 12px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+      padding: 24px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .header { text-align: center; margin-bottom: 20px; }
+    .header h1 { color: #1a1a1a; font-size: 20px; margin-bottom: 2px; }
+    .header p { color: #888; font-size: 13px; }
+
+    /* Stats */
+    .stats { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .stat-card {
+      flex: 1; min-width: 80px; background: #f8f9fa;
+      border-radius: 12px; padding: 14px; text-align: center;
+    }
+    .stat-card .number { font-size: 28px; font-weight: 700; color: #1976d2; }
+    .stat-card .label { font-size: 12px; color: #888; margin-top: 2px; }
+    .stat-card.success .number { color: #2e7d32; }
+    .stat-card.warning .number { color: #f57c00; }
+    .stat-card.danger .number { color: #c62828; }
+
+    /* Filtros */
+    .filtros {
+      display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap;
+      align-items: center;
+    }
+    .filtros input[type="text"] {
+      flex: 1; min-width: 200px; padding: 10px 14px;
+      border: 1px solid #ddd; border-radius: 10px; font-size: 14px;
+    }
+    .filtros select {
+      padding: 10px 14px; border: 1px solid #ddd; border-radius: 10px;
+      font-size: 14px; background: white;
+    }
+
+    /* Botones */
+    .actions { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+    .btn {
+      padding: 12px 20px; border: none; border-radius: 10px;
+      font-size: 15px; font-weight: 600; cursor: pointer;
+      transition: all 0.2s; -webkit-appearance: none;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-vincular { background: #2e7d32; color: white; flex: 1; }
+    .btn-refresh { background: #f0f2f5; color: #333; }
+    .btn-secondary { background: #7b1fa2; color: white; }
+
+    /* Tabla */
+    .table-container {
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+      border-radius: 10px; border: 1px solid #e0e0e0;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 800px; }
+    thead th {
+      background: #f8f9fa; padding: 10px 8px; text-align: left;
+      font-weight: 600; color: #555; border-bottom: 2px solid #e0e0e0; white-space: nowrap;
+      cursor: pointer; user-select: none; position: relative;
+    }
+    thead th:hover { background: #e8eaed; }
+    thead th .sort-arrow { font-size: 10px; margin-left: 4px; color: #999; }
+    thead th.sorted .sort-arrow { color: #1976d2; }
+    thead th.col-acciones { cursor: default; }
+    thead th.col-acciones:hover { background: #f8f9fa; }
+    tbody td { padding: 8px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+    tbody tr:hover { background: #f8f9fa; }
+    tbody tr.vinculado { background: #e8f5e9; }
+    tbody tr.diferente { background: #fff9c4; }
+    tbody tr.sin-sku { background: #fff3e0; }
+
+    /* Estado badges */
+    .estado-badge {
+      display: inline-block; padding: 3px 8px; border-radius: 6px;
+      font-size: 11px; font-weight: 600;
+    }
+    .estado-vinculado { background: #e8f5e9; color: #2e7d32; }
+    .estado-combo { background: #f3e5f5; color: #7b1fa2; }
+    .estado-pendiente { background: #fff9c4; color: #f57c00; }
+    .estado-sin-sku { background: #fff3e0; color: #e65100; }
+    .sugerencia-box {
+      background: #fffde7; border: 1px solid #ffd54f; border-radius: 6px;
+      padding: 5px 8px; margin-top: 4px; font-size: 12px; display: flex;
+      align-items: center; gap: 6px;
+    }
+    .sugerencia-box .sug-texto { flex: 1; color: #5d4037; }
+    .sugerencia-box .sug-sku { font-weight: 700; color: #e65100; }
+    .sugerencia-box .sug-nombre { color: #888; }
+    .btn-aceptar-sug {
+      background: #43a047; color: white; border: none; border-radius: 5px;
+      padding: 3px 10px; font-size: 11px; font-weight: 600; cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-aceptar-sug:hover { background: #388e3c; }
+    .btn-ignorar-sug {
+      background: none; border: none; color: #999; cursor: pointer;
+      font-size: 14px; padding: 0 4px; line-height: 1;
+    }
+    .sku-meli-input { border: 1px solid #ddd; border-radius: 6px; padding: 4px 8px; font-size: 13px; font-weight: 600; width: 140px; transition: border-color 0.2s; }
+    .sku-meli-input:focus { border-color: #7b1fa2; outline: none; }
+    .sku-meli-input.guardando { border-color: #f57c00; background: #fff9c4; }
+    .sku-meli-input.guardado { border-color: #2e7d32; background: #e8f5e9; }
+    .sku-meli-input.error { border-color: #c62828; background: #ffebee; }
+
+    /* Selector de SKU TN */
+    .sku-selector-wrapper { position: relative; min-width: 220px; }
+    .sku-selector-input {
+      width: 100%; padding: 6px 10px; border: 1px solid #ddd;
+      border-radius: 8px; font-size: 13px;
+    }
+    .sku-selector-input:focus { outline: none; border-color: #1976d2; }
+    .sku-selector-input.vinculado { background: #e8f5e9; border-color: #2e7d32; font-weight: 600; }
+    .sku-dropdown {
+      position: absolute; top: 100%; left: 0; right: 0;
+      background: white; border: 1px solid #ddd; border-radius: 8px;
+      max-height: 200px; overflow-y: auto; z-index: 100;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: none;
+    }
+    .sku-dropdown.visible { display: block; }
+    .sku-option {
+      padding: 8px 10px; cursor: pointer; font-size: 12px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .sku-option:hover { background: #e3f2fd; }
+    .sku-option .sku-code { font-weight: 700; color: #1976d2; }
+    .sku-option .sku-name { color: #666; }
+
+    /* Tipo envío */
+    .tipo-full { background: #e8f5e9; color: #2e7d32; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .tipo-deposito { background: #e3f2fd; color: #1565c0; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+
+    /* Progress */
+    .progress-bar {
+      width: 100%; height: 6px; background: #e0e0e0;
+      border-radius: 3px; margin-bottom: 16px; overflow: hidden; display: none;
+    }
+    .progress-bar.visible { display: block; }
+    .progress-fill {
+      height: 100%; background: #2e7d32; border-radius: 3px;
+      transition: width 0.3s; width: 0%;
+    }
+    .progress-text {
+      text-align: center; font-size: 13px; color: #666;
+      margin-bottom: 12px; display: none;
+    }
+    .progress-text.visible { display: block; }
+
+    /* Resultados */
+    .resultado-item {
+      padding: 10px 14px; margin-bottom: 6px; border-radius: 8px;
+      font-size: 13px; display: flex; align-items: center; gap: 10px;
+    }
+    .resultado-ok { background: #e8f5e9; color: #2e7d32; }
+    .resultado-error { background: #ffebee; color: #c62828; }
+    .resultado-omitido { background: #f5f5f5; color: #888; }
+
+    /* Loading & Empty */
+    .loading { text-align: center; padding: 40px; color: #666; }
+    .spinner {
+      display: inline-block; width: 32px; height: 32px;
+      border: 3px solid #ddd; border-top-color: #2e7d32;
+      border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .link-form { text-align: center; margin-top: 16px; font-size: 13px; }
+    .link-form a { color: #1976d2; text-decoration: none; }
+
+    .titulo-meli {
+      max-width: 250px; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+      font-size: 12px; color: #555;
+    }
+
+    .btn-limpiar {
+      background: none; border: none; color: #c62828; cursor: pointer;
+      font-size: 16px; padding: 2px 6px; border-radius: 4px;
+    }
+    .btn-limpiar:hover { background: #ffebee; }
+
+    /* Composiciones */
+    .btn-combo {
+      background: #7b1fa2; color: white; border: none; border-radius: 6px;
+      font-size: 11px; padding: 3px 8px; cursor: pointer; margin-top: 4px;
+    }
+    .btn-combo:hover { background: #6a1b9a; }
+    .btn-combo.tiene-combo { background: #e91e63; }
+    .combo-panel {
+      background: #faf5ff; border: 1px solid #ce93d8; border-radius: 8px;
+      padding: 10px; margin-top: 6px; font-size: 12px;
+    }
+    .combo-row {
+      display: flex; gap: 6px; align-items: center; margin-bottom: 4px;
+    }
+    .combo-row input[type="text"] {
+      flex: 1; padding: 5px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px;
+    }
+    .combo-row input[type="number"] {
+      width: 60px; padding: 5px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px; text-align: center;
+    }
+    .combo-btn-add {
+      background: #4caf50; color: white; border: none; border-radius: 6px;
+      font-size: 11px; padding: 4px 10px; cursor: pointer;
+    }
+    .combo-btn-remove {
+      background: none; border: none; color: #c62828; cursor: pointer; font-size: 14px;
+    }
+    .combo-btn-save {
+      background: #7b1fa2; color: white; border: none; border-radius: 6px;
+      font-size: 12px; padding: 6px 14px; cursor: pointer; margin-top: 6px;
+    }
+    .combo-btn-save:hover { background: #6a1b9a; }
+    .combo-info {
+      font-size: 11px; color: #7b1fa2; margin-top: 4px; font-weight: 600;
+    }
+
+    @media (max-width: 500px) {
+      .container { padding: 16px; }
+      .stats { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Vincular publicaciones MeLi ↔ TiendaNube</h1>
+      <p>Tu Textil — Asignar mismo SKU para identificar publicaciones iguales en ambos canales</p>
+    </div>
+
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>Cargando publicaciones de MercadoLibre y productos de TiendaNube...</p>
+      <p style="font-size:12px;color:#999;margin-top:8px;">Esto puede tardar hasta 1 minuto</p>
+    </div>
+
+    <div id="content" style="display:none;">
+
+      <!-- Estadísticas -->
+      <div class="stats">
+        <div class="stat-card">
+          <div class="number" id="countTotal">0</div>
+          <div class="label">Total MeLi</div>
+        </div>
+        <div class="stat-card success">
+          <div class="number" id="countVinculados">0</div>
+          <div class="label">Ya vinculados</div>
+        </div>
+        <div class="stat-card warning">
+          <div class="number" id="countPendientes">0</div>
+          <div class="label">Por vincular</div>
+        </div>
+        <div class="stat-card danger">
+          <div class="number" id="countSinSku">0</div>
+          <div class="label">Sin SKU en MeLi</div>
+        </div>
+      </div>
+
+      <!-- Banner de novedades -->
+      <div id="bannerNovedades" style="display:none;background:#fff3cd;border:1px solid #ffc107;border-radius:10px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <span id="bannerNovedadesTexto" style="color:#856404;font-weight:600;">🆕 Hay productos nuevos</span>
+        <button onclick="cargarDatos()" style="padding:8px 18px;background:#2e7d32;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">🔄 Actualizar ahora</button>
+      </div>
+
+      <!-- Filtros -->
+      <div class="filtros">
+        <input type="text" id="filtroTexto" placeholder="Buscar por título, SKU..." oninput="filtrarTabla()">
+        <select id="filtroEstado" onchange="filtrarTabla()">
+          <option value="todos">Todos</option>
+          <option value="pendiente">Por vincular</option>
+          <option value="vinculado">Ya vinculados</option>
+          <option value="combo">📦 Combos</option>
+          <option value="sin-sku">Sin SKU</option>
+        </select>
+      </div>
+
+      <!-- Acciones -->
+      <div class="actions">
+        <button class="btn btn-vincular" id="btnVincular" onclick="ejecutarVinculacion()" disabled>
+          🔗 Vincular seleccionados
+        </button>
+        <button class="btn btn-refresh" onclick="cargarDatos()">🔄</button>
+      </div>
+
+      <!-- Progreso -->
+      <div class="progress-bar" id="progressBar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <div class="progress-text" id="progressText"></div>
+
+      <!-- Resultados -->
+      <div id="resultados"></div>
+
+      <!-- Tabla -->
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th onclick="ordenarTabla('titulo')">Publicación MeLi <span class="sort-arrow" id="sort-titulo">▲▼</span></th>
+              <th onclick="ordenarTabla('sku')">SKU MeLi actual <span class="sort-arrow" id="sort-sku">▲▼</span></th>
+              <th onclick="ordenarTabla('tipo')">Tipo <span class="sort-arrow" id="sort-tipo">▲▼</span></th>
+              <th onclick="ordenarTabla('stock')">Stock <span class="sort-arrow" id="sort-stock">▲▼</span></th>
+              <th>Vincular con SKU TiendaNube</th>
+              <th onclick="ordenarTabla('estado')">Estado <span class="sort-arrow" id="sort-estado">▲▼</span></th>
+              <th class="col-acciones"></th>
+            </tr>
+          </thead>
+          <tbody id="tablaBody"></tbody>
+        </table>
+      </div>
+
+      <div class="link-form" style="margin-top:20px;">
+        <a href="?page=actualizar">← Volver al panel de actualización</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var itemsMeli = [];
+    var productosTN = []; // Array de {sku, nombre, variante, skuCompleto}
+    var vinculaciones = {}; // idx -> skuTN seleccionado
+    var composiciones = {}; // "MLAID|VARIACIONID" -> [{sku, cantidad}, ...]
+    var mapaVinculacionesTN = {}; // "itemId|||variacionId" -> varianteTN
+    var dropdownActivo = null;
+
+    // ============================================================
+    // INICIALIZACION
+    // ============================================================
+    var autoRefreshInterval = null;
+    var ultimoConteoMeLi = null;
+    var ultimoConteoTN = null;
+
+    window.onload = function() {
+      cargarDatos();
+      // Cada 5 minutos chequear si hay novedades (sin recargar)
+      autoRefreshInterval = setInterval(chequearNovedades, 5 * 60 * 1000);
+      // Cerrar dropdowns al hacer click fuera
+      document.addEventListener('click', function(e) {
+        if (!e.target.classList.contains('sku-selector-input') && !e.target.classList.contains('combo-sku-input')) {
+          cerrarTodosDropdowns();
+          if (typeof cerrarTodosComboDropdowns === 'function') cerrarTodosComboDropdowns();
+        }
+      });
+    };
+
+    function chequearNovedades() {
+      google.script.run
+        .withSuccessHandler(function(info) {
+          var mensajes = [];
+          if (ultimoConteoMeLi !== null && info.totalMeLi > ultimoConteoMeLi) {
+            mensajes.push((info.totalMeLi - ultimoConteoMeLi) + ' publicaciones nuevas en MercadoLibre');
+          }
+          if (info.nuevosTN > 0) {
+            mensajes.push(info.nuevosTN + ' variantes nuevas en TiendaNube');
+          }
+          ultimoConteoMeLi = info.totalMeLi;
+          ultimoConteoTN = info.totalTN;
+
+          if (mensajes.length > 0) {
+            document.getElementById('bannerNovedadesTexto').textContent = '🆕 ' + mensajes.join(' y ');
+            document.getElementById('bannerNovedades').style.display = 'flex';
+          }
+        })
+        .withFailureHandler(function() {
+          // Si falla el check, no molestar al usuario
+        })
+        .chequearHayNovedades();
+    }
+
+    function cargarDatos() {
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('content').style.display = 'none';
+      document.getElementById('resultados').innerHTML = '';
+      document.getElementById('bannerNovedades').style.display = 'none';
+      vinculaciones = {};
+
+      google.script.run
+        .withSuccessHandler(function(data) {
+          itemsMeli = data.itemsMeli;
+          productosTN = data.productosTN;
+          composiciones = data.composiciones || {};
+          mapaVinculacionesTN = data.mapaVinculacionesTN || {};
+          productosTNCache = null; // invalidar cache para rearmarlo con los datos nuevos
+          // Guardar conteos base para comparar en el próximo check
+          ultimoConteoMeLi = itemsMeli.length;
+          ultimoConteoTN = productosTN.length;
+          mostrarTabla();
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('content').style.display = 'block';
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('loading').innerHTML =
+            '<p style="color:#c62828;font-size:16px;font-weight:600;">⚠️ Error al cargar datos</p>' +
+            '<p style="color:#c62828;margin-top:8px;">' + (error.message || error) + '</p>' +
+            '<p style="font-size:13px;color:#888;margin-top:12px;">Posibles causas: MercadoLibre no conectado, o demasiadas publicaciones (timeout).</p>' +
+            '<button onclick="cargarDatos()" style="margin-top:16px;padding:10px 24px;background:#2e7d32;color:white;border:none;border-radius:10px;font-size:15px;cursor:pointer;">🔄 Reintentar</button>';
+        })
+        .obtenerDatosVinculacion();
+    }
+
+    // ============================================================
+    // MOSTRAR TABLA
+    // ============================================================
+    function mostrarTabla() {
+      var body = document.getElementById('tablaBody');
+      var html = '';
+
+      // Construir un mapa de SKUs de TN para match rápido
+      var mapaTN = {};
+      productosTN.forEach(function(p) {
+        mapaTN[p.sku.toUpperCase()] = true;
+      });
+
+      // Pre-clasificar cada item para poder ordenar
+      for (var ci = 0; ci < itemsMeli.length; ci++) {
+        var cItem = itemsMeli[ci];
+        var cSku = (cItem.sku || '').trim();
+        if (!cSku) {
+          cItem._orden = 1; // sin-sku segundo
+        } else if (!mapaTN[cSku.toUpperCase()] && !tieneCombo(cItem)) {
+          cItem._orden = 0; // pendientes arriba de todo
+        } else {
+          cItem._orden = 2; // vinculados al final
+        }
+      }
+
+      // Ordenar: pendientes (0) → sin-sku (1) → vinculados (2)
+      itemsMeli.sort(function(a, b) {
+        return a._orden - b._orden;
+      });
+
+      var totalVinculados = 0;
+      var totalPendientes = 0;
+      var totalSinSku = 0;
+
+      for (var i = 0; i < itemsMeli.length; i++) {
+        var item = itemsMeli[i];
+        var skuMeli = (item.sku || '').trim();
+        var tipoClass = item.logisticType === 'fulfillment' ? 'tipo-full' : 'tipo-deposito';
+        var tipoLabel = item.logisticType === 'fulfillment' ? 'Full' : 'Depósito';
+
+        // Determinar estado
+        var estado = 'pendiente';
+        var estadoLabel = 'Por vincular';
+        var estadoClass = 'estado-pendiente';
+        var rowClass = 'diferente';
+
+        var esCombo = tieneCombo(item);
+
+        if (!skuMeli) {
+          estado = 'sin-sku';
+          estadoLabel = 'Sin SKU';
+          estadoClass = 'estado-sin-sku';
+          rowClass = 'sin-sku';
+          totalSinSku++;
+        } else if (mapaTN[skuMeli.toUpperCase()]) {
+          estado = 'vinculado';
+          estadoLabel = 'Vinculado';
+          estadoClass = 'estado-vinculado';
+          rowClass = 'vinculado';
+          totalVinculados++;
+        } else if (esCombo) {
+          estado = 'combo';
+          estadoLabel = '📦 Combo';
+          estadoClass = 'estado-combo';
+          rowClass = 'vinculado';
+          totalVinculados++;
+        } else {
+          totalPendientes++;
+        }
+
+        item._estado = estado;
+        item._idx = i;
+
+        html += '<tr class="fila-item ' + rowClass + '" data-idx="' + i + '" data-estado="' + estado + '">' +
+          '<td>' +
+            '<div class="titulo-meli" title="' + escapeHtml(item.titulo) + '">' + escapeHtml(item.titulo) + '</div>' +
+            '<div style="font-size:11px;color:#999;">' + item.itemId + (item.variante !== '(Sin variante)' ? ' — ' + escapeHtml(item.variante) : '') +
+              (item.estado === 'closed' ? ' <span style="color:#d32f2f;font-weight:bold;font-size:10px;">CERRADA</span>' : '') + '</div>' +
+          '</td>' +
+          '<td><input type="text" class="sku-meli-input" id="skumeli-' + i + '" value="' + escapeHtml(skuMeli) + '" ' +
+            'placeholder="SKU MeLi" ' +
+            (item.estado === 'closed' ? 'disabled title="Publicación CERRADA — no se puede editar" style="opacity:0.5;cursor:not-allowed;" ' :
+            'onchange="cambiarSkuMeli(' + i + ')" title="Editar SKU en MercadoLibre" ') +
+            '></td>' +
+          '<td><span class="' + tipoClass + '">' + tipoLabel + '</span></td>' +
+          '<td>' + item.stock + '</td>' +
+          '<td>' +
+            '<div class="sku-selector-wrapper" id="wrapper-' + i + '">' +
+              '<input type="text" class="sku-selector-input' + (estado === 'vinculado' ? ' vinculado' : '') + '" ' +
+                'id="input-' + i + '" ' +
+                'placeholder="Buscar SKU de TiendaNube..." ' +
+                'value="' + (estado === 'vinculado' ? escapeHtml(skuMeli) : '') + '" ' +
+                'onfocus="abrirDropdown(' + i + ')" ' +
+                'oninput="buscarSKU(' + i + ')">' +
+              '<div class="sku-dropdown" id="dropdown-' + i + '"></div>' +
+            '</div>' +
+            (function() {
+              if (estado !== 'vinculado') return '';
+              var keyVinc = item.itemId + '|||' + (item.variacionId || '');
+              var varTN = mapaVinculacionesTN[keyVinc] || '';
+              return varTN ? '<div id="varttn-' + i + '" style="font-size:11px;color:#555;margin-top:2px;padding-left:2px;">(' + escapeHtml(varTN) + ')</div>' :
+                             '<div id="varttn-' + i + '" style="display:none;"></div>';
+            })() +
+            '<div id="sugerencia-' + i + '"></div>' +
+            renderComboInfo(item) +
+            '<button class="btn-combo' + (tieneCombo(item) ? ' tiene-combo' : '') + '" onclick="toggleComboPanel(' + i + ')">' +
+              (tieneCombo(item) ? '📦 Editar combo' : '+ Combo/Pack') +
+            '</button>' +
+            '<div id="combo-panel-' + i + '" style="display:none;"></div>' +
+          '</td>' +
+          '<td><span class="estado-badge ' + estadoClass + '" id="estado-' + i + '">' + estadoLabel + '</span></td>' +
+          '<td>' +
+            '<button class="btn-limpiar" onclick="limpiarVinculacion(' + i + ')" title="Limpiar vinculación">✕</button>' +
+          '</td>' +
+          '</tr>';
+      }
+
+      body.innerHTML = html;
+
+      // Estadísticas
+      document.getElementById('countTotal').textContent = itemsMeli.length;
+      document.getElementById('countVinculados').textContent = totalVinculados;
+      document.getElementById('countPendientes').textContent = totalPendientes;
+      document.getElementById('countSinSku').textContent = totalSinSku;
+
+      actualizarBotonVincular();
+      generarSugerencias();
+    }
+
+    // ============================================================
+    // SUGERENCIAS AUTOMATICAS
+    // ============================================================
+
+    function normalizarTexto(str) {
+      return (str || '').toUpperCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^A-Z0-9 ]/g, ' ')
+        .replace(/\s+/g, ' ').trim();
+    }
+
+    function extraerPalabrasRelevantes(texto) {
+      var stopWords = ['DE','DEL','LA','EL','LOS','LAS','UN','UNA','EN','CON','POR','PARA','SET','JUEGO','PACK','X','Y','CM','MTS'];
+      var palabras = normalizarTexto(texto).split(' ');
+      return palabras.filter(function(p) {
+        return p.length > 1 && stopWords.indexOf(p) === -1;
+      });
+    }
+
+    // Cache de productos TN con strings ya normalizados (se calcula una sola vez)
+    var productosTNCache = null;
+    var sugerenciasJobId = 0; // Para cancelar jobs anteriores
+
+    function construirCacheProductosTN() {
+      productosTNCache = [];
+      for (var i = 0; i < productosTN.length; i++) {
+        var p = productosTN[i];
+        productosTNCache.push({
+          sku: p.sku,
+          nombre: p.nombre,
+          variante: p.variante,
+          skuNorm: normalizarTexto(p.sku),
+          nombreNorm: normalizarTexto(p.nombre),
+          varianteNorm: normalizarTexto(p.variante),
+          palabrasNombre: extraerPalabrasRelevantes(p.nombre)
+        });
+      }
+    }
+
+    function calcularScoreCache(itemCache, productoCache) {
+      var score = 0;
+      var skuMeli = itemCache.skuNorm;
+      var skuTN = productoCache.skuNorm;
+
+      // 1. Coincidencia exacta de SKU
+      if (skuMeli && skuTN && skuMeli === skuTN) return 1000;
+
+      // 2. SKU de MeLi contiene SKU de TN o viceversa
+      if (skuMeli && skuTN) {
+        if (skuMeli.indexOf(skuTN) !== -1) score += 200;
+        else if (skuTN.indexOf(skuMeli) !== -1) score += 200;
+        // Prefijo común
+        var minLen = skuMeli.length < skuTN.length ? skuMeli.length : skuTN.length;
+        if (minLen >= 3) {
+          var comun = 0;
+          for (var c = 0; c < minLen; c++) {
+            if (skuMeli.charCodeAt(c) === skuTN.charCodeAt(c)) comun++;
+            else break;
+          }
+          if (comun >= 3) score += comun * 15;
+        }
+      }
+
+      // 3. Palabras del título vs nombre TN
+      var palabrasMeli = itemCache.palabrasTitulo;
+      var palabrasTN = productoCache.palabrasNombre;
+      if (palabrasMeli.length > 0 && palabrasTN.length > 0) {
+        var coincidencias = 0;
+        for (var pm = 0; pm < palabrasMeli.length; pm++) {
+          for (var pt = 0; pt < palabrasTN.length; pt++) {
+            if (palabrasMeli[pm] === palabrasTN[pt]) {
+              coincidencias++;
+              break;
+            }
+          }
+        }
+        var maxLen = palabrasMeli.length > palabrasTN.length ? palabrasMeli.length : palabrasTN.length;
+        score += Math.round((coincidencias / maxLen) * 100);
+      }
+
+      // 4. Variante
+      var varianteMeli = itemCache.varianteNorm;
+      var varianteTN = productoCache.varianteNorm;
+      if (varianteMeli && varianteTN) {
+        if (varianteMeli === varianteTN) {
+          score += 30;
+        } else {
+          var palVarMeli = varianteMeli.split(' ');
+          var palVarTN = varianteTN.split(' ');
+          for (var vm = 0; vm < palVarMeli.length; vm++) {
+            if (palVarMeli[vm].length > 2) {
+              for (var vt = 0; vt < palVarTN.length; vt++) {
+                if (palVarMeli[vm] === palVarTN[vt]) {
+                  score += 15;
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      return score;
+    }
+
+    function buscarMejorSugerenciaCache(itemCache) {
+      var mejor = null;
+      var mejorScore = 0;
+      var lista = productosTNCache;
+      var len = lista.length;
+
+      for (var p = 0; p < len; p++) {
+        var score = calcularScoreCache(itemCache, lista[p]);
+        if (score > mejorScore) {
+          mejorScore = score;
+          mejor = lista[p];
+        }
+      }
+
+      if (mejorScore >= 50 && mejor) {
+        return { sku: mejor.sku, nombre: mejor.nombre, variante: mejor.variante, score: mejorScore };
+      }
+      return null;
+    }
+
+    function generarSugerencias() {
+      // Cancelar job anterior si estaba corriendo
+      sugerenciasJobId++;
+      var miJobId = sugerenciasJobId;
+
+      // Construir cache si no existe
+      if (!productosTNCache) construirCacheProductosTN();
+
+      // Mapa de SKUs de TN para chequeo rápido de vinculados
+      var mapaTN = {};
+      for (var t = 0; t < productosTN.length; t++) {
+        mapaTN[productosTN[t].sku.toUpperCase()] = true;
+      }
+
+      // Preparar items a procesar (solo pendientes y sin-sku)
+      var itemsAProcesar = [];
+      for (var i = 0; i < itemsMeli.length; i++) {
+        var item = itemsMeli[i];
+        var skuMeli = (item.sku || '').trim();
+        var esVinculado = skuMeli && mapaTN[skuMeli.toUpperCase()];
+        var esCombo = tieneCombo(item);
+        if (esVinculado || esCombo) continue;
+
+        itemsAProcesar.push({
+          idx: i,
+          skuNorm: normalizarTexto(item.sku),
+          varianteNorm: normalizarTexto(item.variante),
+          palabrasTitulo: extraerPalabrasRelevantes(item.titulo)
+        });
+      }
+
+      // Procesar en lotes de 15 cada 30ms para no bloquear la UI
+      var BATCH_SIZE = 15;
+      var DELAY_MS = 30;
+      var cursor = 0;
+
+      function procesarLote() {
+        // Si se lanzó otro job, abortar este
+        if (miJobId !== sugerenciasJobId) return;
+
+        var fin = Math.min(cursor + BATCH_SIZE, itemsAProcesar.length);
+        for (var k = cursor; k < fin; k++) {
+          var itemCache = itemsAProcesar[k];
+          var sugDiv = document.getElementById('sugerencia-' + itemCache.idx);
+          if (!sugDiv) continue;
+
+          var sug = buscarMejorSugerenciaCache(itemCache);
+          if (sug) {
+            var displayNombre = sug.nombre;
+            if (sug.variante) displayNombre += ' (' + sug.variante + ')';
+            sugDiv.innerHTML =
+              '<div class="sugerencia-box">' +
+                '<div class="sug-texto">💡 <span class="sug-sku">' + escapeHtml(sug.sku) + '</span> ' +
+                  '<span class="sug-nombre">' + escapeHtml(displayNombre) + '</span></div>' +
+                '<button class="btn-aceptar-sug" onclick="aceptarSugerencia(' + itemCache.idx + ', \'' + escapeJs(sug.sku) + '\')">✅ Aceptar</button>' +
+                '<button class="btn-ignorar-sug" onclick="this.parentElement.parentElement.innerHTML=\'\'" title="Ignorar">✕</button>' +
+              '</div>';
+          }
+        }
+
+        cursor = fin;
+        if (cursor < itemsAProcesar.length) {
+          setTimeout(procesarLote, DELAY_MS);
+        }
+      }
+
+      // Limpiar sugerencias anteriores visibles
+      for (var c = 0; c < itemsMeli.length; c++) {
+        var d = document.getElementById('sugerencia-' + c);
+        if (d) d.innerHTML = '';
+      }
+
+      // Arrancar
+      if (itemsAProcesar.length > 0) {
+        setTimeout(procesarLote, DELAY_MS);
+      }
+    }
+
+    function aceptarSugerencia(idx, sku) {
+      // Poner el SKU en el input y disparar la vinculación automática
+      var input = document.getElementById('input-' + idx);
+      input.value = sku;
+      document.getElementById('sugerencia-' + idx).innerHTML = '';
+      seleccionarSKU(idx, sku);
+    }
+
+    // ============================================================
+    // BUSCADOR DE SKU
+    // ============================================================
+    function abrirDropdown(idx) {
+      cerrarTodosDropdowns();
+      var input = document.getElementById('input-' + idx);
+      buscarSKU(idx);
+    }
+
+    function cerrarTodosDropdowns() {
+      var dropdowns = document.querySelectorAll('.sku-dropdown');
+      dropdowns.forEach(function(d) { d.classList.remove('visible'); });
+    }
+
+    function buscarSKU(idx) {
+      var input = document.getElementById('input-' + idx);
+      var dropdown = document.getElementById('dropdown-' + idx);
+      var query = input.value.toUpperCase().trim();
+
+      var resultados = [];
+      for (var i = 0; i < productosTN.length; i++) {
+        var p = productosTN[i];
+        if (!query || p.sku.toUpperCase().indexOf(query) !== -1 ||
+            p.nombre.toUpperCase().indexOf(query) !== -1) {
+          resultados.push(p);
+          if (resultados.length >= 50) break;
+        }
+      }
+
+      if (resultados.length === 0) {
+        dropdown.innerHTML = '<div style="padding:10px;color:#999;font-size:12px;">No se encontraron coincidencias</div>';
+      } else {
+        var html = '';
+        resultados.forEach(function(p) {
+          html += '<div class="sku-option" onmousedown="seleccionarSKU(' + idx + ', \'' + escapeJs(p.sku) + '\', \'' + escapeJs(p.variante || '') + '\')">' +
+            '<span class="sku-code">' + escapeHtml(p.sku) + '</span> ' +
+            '<span class="sku-name">' + escapeHtml(p.nombre) + '</span>' +
+            (p.variante ? ' <span style="color:#999;font-size:11px;">(' + escapeHtml(p.variante) + ')</span>' : '') +
+            '</div>';
+        });
+        dropdown.innerHTML = html;
+      }
+
+      dropdown.classList.add('visible');
+    }
+
+    function seleccionarSKU(idx, sku, varianteTN) {
+      var input = document.getElementById('input-' + idx);
+      input.value = sku;
+      input.classList.add('vinculado');
+      cerrarTodosDropdowns();
+
+      // Guardar la vinculación completa "SKU — Variante" para columna H
+      var vinculacionTN = sku;
+      if (varianteTN) vinculacionTN += ' — ' + varianteTN;
+      input.dataset.vinculacionTN = vinculacionTN;
+
+      // Mostrar variante TN debajo del input
+      var divVarTN = document.getElementById('varttn-' + idx);
+      if (divVarTN) {
+        if (varianteTN) {
+          divVarTN.textContent = '(' + varianteTN + ')';
+          divVarTN.style.display = '';
+        } else {
+          divVarTN.style.display = 'none';
+        }
+      }
+
+      var item = itemsMeli[idx];
+
+      // Si es el mismo SKU que ya tiene, no hacer nada
+      if (item.sku === sku) {
+        var estadoBadge = document.getElementById('estado-' + idx);
+        estadoBadge.className = 'estado-badge estado-vinculado';
+        estadoBadge.textContent = 'Vinculado';
+        // Igual guardar la vinculación TN en la hoja
+        google.script.run.guardarVinculacionTN(item.itemId, item.variacionId || '', vinculacionTN);
+        return;
+      }
+
+      // Vincular automáticamente
+      var estadoBadge = document.getElementById('estado-' + idx);
+      estadoBadge.className = 'estado-badge estado-pendiente';
+      estadoBadge.textContent = '⏳ Vinculando...';
+      input.disabled = true;
+
+      var cambio = {
+        itemId: item.itemId,
+        variacionId: item.variacionId || null,
+        skuActual: item.sku || '',
+        skuNuevo: sku,
+        vinculacionTN: vinculacionTN,
+        titulo: item.titulo,
+        variante: item.variante || '(Sin variante)',
+        stock: item.stock || 0,
+        precio: item.precio || 0,
+        tipo: item.logisticType === 'fulfillment' ? 'Full' : 'Deposito'
+      };
+
+      // Timeout de seguridad: si no responde en 45 seg, mostrar error
+      var vinculacionCompleta = false;
+      var timeoutId = setTimeout(function() {
+        if (!vinculacionCompleta) {
+          estadoBadge.className = 'estado-badge estado-pendiente';
+          estadoBadge.textContent = '⚠️ Timeout — reintentar';
+          input.disabled = false;
+          input.classList.remove('vinculado');
+        }
+      }, 45000);
+
+      var successHandler = function(resultados) {
+          vinculacionCompleta = true;
+          clearTimeout(timeoutId);
+          var r = resultados[0];
+          if (r && r.success) {
+            estadoBadge.className = 'estado-badge estado-vinculado';
+            estadoBadge.textContent = r.interno ? '🔗 Vinculado (interno)' : '✅ Vinculado';
+            item.sku = sku;
+            input.classList.add('vinculado');
+            // Reflejar el nuevo SKU en la columna "SKU MeLi"
+            var inputMeli = document.getElementById('skumeli-' + idx);
+            if (inputMeli) {
+              inputMeli.value = sku;
+              inputMeli.classList.add('guardado');
+              setTimeout(function() { inputMeli.classList.remove('guardado'); }, 3000);
+            }
+            actualizarContadores();
+          } else {
+            var errorMsg = (r && r.error) ? r.error : 'Error desconocido';
+            estadoBadge.className = 'estado-badge estado-pendiente';
+            estadoBadge.textContent = '❌ ' + errorMsg.substring(0, 40);
+            input.classList.remove('vinculado');
+          }
+          input.disabled = false;
+        };
+
+      var failureHandler = function(error) {
+          vinculacionCompleta = true;
+          clearTimeout(timeoutId);
+          estadoBadge.className = 'estado-badge estado-pendiente';
+          estadoBadge.textContent = '❌ ' + (error.message || 'Error');
+          input.disabled = false;
+          input.classList.remove('vinculado');
+        };
+
+      // Si la publicación está cerrada, vincular solo internamente (sin tocar MeLi API)
+      if (item.estado === 'closed') {
+        google.script.run
+          .withSuccessHandler(successHandler)
+          .withFailureHandler(failureHandler)
+          .vincularSoloInterno([cambio]);
+      } else {
+        google.script.run
+          .withSuccessHandler(successHandler)
+          .withFailureHandler(failureHandler)
+          .ejecutarVinculacionWeb([cambio]);
+      }
+    }
+
+    function cambiarSkuMeli(idx) {
+      var item = itemsMeli[idx];
+      var inputMeli = document.getElementById('skumeli-' + idx);
+      var nuevoSku = inputMeli.value.trim();
+      var skuAnterior = item.sku || '';
+
+      // Si no cambió, no hacer nada
+      if (nuevoSku === skuAnterior) return;
+
+      inputMeli.classList.add('guardando');
+      inputMeli.classList.remove('guardado', 'error');
+      inputMeli.disabled = true;
+
+      var cambio = {
+        itemId: item.itemId,
+        variacionId: item.variacionId || null,
+        skuActual: skuAnterior,
+        skuNuevo: nuevoSku,
+        titulo: item.titulo,
+        variante: item.variante || '(Sin variante)',
+        stock: item.stock || 0,
+        precio: item.precio || 0,
+        tipo: item.logisticType === 'fulfillment' ? 'Full' : 'Deposito'
+      };
+
+      google.script.run
+        .withSuccessHandler(function(resultados) {
+          var r = resultados[0];
+          if (r && r.success) {
+            item.sku = nuevoSku;
+            inputMeli.classList.remove('guardando');
+            inputMeli.classList.add('guardado');
+            inputMeli.disabled = false;
+            // Actualizar el input de TN si el nuevo SKU coincide
+            actualizarContadores();
+            // Quitar clase de éxito después de 3 seg
+            setTimeout(function() { inputMeli.classList.remove('guardado'); }, 3000);
+          } else {
+            var errorMsg = (r && r.error) ? r.error : 'Error';
+            inputMeli.classList.remove('guardando');
+            inputMeli.classList.add('error');
+            inputMeli.disabled = false;
+            // Mensaje amigable según tipo de error
+            var msgAmigable = errorMsg;
+            if (errorMsg.indexOf('status:closed') !== -1 || errorMsg.indexOf('Cannot update item') !== -1) {
+              msgAmigable = 'No se puede modificar: la publicación ' + (r.itemId || '') + ' está CERRADA en MeLi. Solo se pueden editar publicaciones activas.';
+            } else if (errorMsg.indexOf('not_updatable') !== -1 || errorMsg.indexOf('not modifiable') !== -1) {
+              msgAmigable = 'MeLi no permite modificar las variaciones de esta publicación.';
+            }
+            inputMeli.title = 'Error: ' + msgAmigable;
+            alert(msgAmigable);
+            // Restaurar valor anterior
+            inputMeli.value = skuAnterior;
+            setTimeout(function() { inputMeli.classList.remove('error'); }, 3000);
+          }
+        })
+        .withFailureHandler(function(error) {
+          inputMeli.classList.remove('guardando');
+          inputMeli.classList.add('error');
+          inputMeli.disabled = false;
+          alert('Error: ' + (error.message || 'No se pudo actualizar'));
+          inputMeli.value = skuAnterior;
+          setTimeout(function() { inputMeli.classList.remove('error'); }, 3000);
+        })
+        .ejecutarVinculacionWeb([cambio]);
+    }
+
+    function actualizarContadores() {
+      var mapaTN = {};
+      productosTN.forEach(function(p) { mapaTN[p.sku.toUpperCase()] = true; });
+      var totalVinculados = 0, totalPendientes = 0, totalSinSku = 0;
+      for (var i = 0; i < itemsMeli.length; i++) {
+        var skuMeli = (itemsMeli[i].sku || '').trim();
+        if (!skuMeli) { totalSinSku++; }
+        else if (mapaTN[skuMeli.toUpperCase()] || tieneCombo(itemsMeli[i])) { totalVinculados++; }
+        else { totalPendientes++; }
+      }
+      document.getElementById('countVinculados').textContent = totalVinculados;
+      document.getElementById('countPendientes').textContent = totalPendientes;
+      document.getElementById('countSinSku').textContent = totalSinSku;
+    }
+
+    function limpiarVinculacion(idx) {
+      var input = document.getElementById('input-' + idx);
+      input.value = '';
+      input.classList.remove('vinculado');
+      delete vinculaciones[idx];
+
+      // Limpiar variante TN
+      var divVarTN = document.getElementById('varttn-' + idx);
+      if (divVarTN) { divVarTN.textContent = ''; divVarTN.style.display = 'none'; }
+
+      var estadoBadge = document.getElementById('estado-' + idx);
+      var item = itemsMeli[idx];
+      if (!item.sku) {
+        estadoBadge.className = 'estado-badge estado-sin-sku';
+        estadoBadge.textContent = 'Sin SKU';
+      } else {
+        estadoBadge.className = 'estado-badge estado-pendiente';
+        estadoBadge.textContent = 'Por vincular';
+      }
+
+      actualizarBotonVincular();
+    }
+
+    function actualizarBotonVincular() {
+      var count = Object.keys(vinculaciones).length;
+      var btn = document.getElementById('btnVincular');
+      if (count === 0) {
+        btn.textContent = '🔗 Seleccioná SKUs de TiendaNube para vincular';
+        btn.disabled = true;
+      } else {
+        btn.textContent = '🔗 Vincular ' + count + ' publicaciones';
+        btn.disabled = false;
+      }
+    }
+
+    // ============================================================
+    // ORDENAR TABLA
+    // ============================================================
+    var ordenActual = { campo: null, ascendente: true };
+
+    function ordenarTabla(campo) {
+      // Cambiar dirección si es el mismo campo
+      if (ordenActual.campo === campo) {
+        ordenActual.ascendente = !ordenActual.ascendente;
+      } else {
+        ordenActual.campo = campo;
+        ordenActual.ascendente = true;
+      }
+
+      // Construir mapa de estados para ordenar
+      var mapaTN = {};
+      productosTN.forEach(function(p) { mapaTN[p.sku.toUpperCase()] = true; });
+
+      // Ordenar itemsMeli
+      itemsMeli.sort(function(a, b) {
+        var valA, valB;
+
+        switch(campo) {
+          case 'titulo':
+            valA = (a.titulo || '').toUpperCase();
+            valB = (b.titulo || '').toUpperCase();
+            break;
+          case 'sku':
+            valA = (a.sku || '').toUpperCase();
+            valB = (b.sku || '').toUpperCase();
+            break;
+          case 'tipo':
+            valA = a.logisticType || '';
+            valB = b.logisticType || '';
+            break;
+          case 'stock':
+            valA = a.stock || 0;
+            valB = b.stock || 0;
+            if (valA !== valB) return ordenActual.ascendente ? valA - valB : valB - valA;
+            return 0;
+          case 'estado':
+            var estadoA = !a.sku ? 2 : (mapaTN[(a.sku || '').toUpperCase()] ? 0 : 1);
+            var estadoB = !b.sku ? 2 : (mapaTN[(b.sku || '').toUpperCase()] ? 0 : 1);
+            if (estadoA !== estadoB) return ordenActual.ascendente ? estadoA - estadoB : estadoB - estadoA;
+            return 0;
+          default:
+            return 0;
+        }
+
+        if (valA < valB) return ordenActual.ascendente ? -1 : 1;
+        if (valA > valB) return ordenActual.ascendente ? 1 : -1;
+        return 0;
+      });
+
+      // Actualizar flechas visuales
+      var campos = ['titulo', 'sku', 'tipo', 'stock', 'estado'];
+      campos.forEach(function(c) {
+        var el = document.getElementById('sort-' + c);
+        if (el) {
+          if (c === campo) {
+            el.textContent = ordenActual.ascendente ? '▲' : '▼';
+            el.parentElement.classList.add('sorted');
+          } else {
+            el.textContent = '▲▼';
+            el.parentElement.classList.remove('sorted');
+          }
+        }
+      });
+
+      // Redibujar tabla
+      mostrarTabla();
+      filtrarTabla();
+    }
+
+    // ============================================================
+    // FILTRAR TABLA
+    // ============================================================
+    function filtrarTabla() {
+      var texto = document.getElementById('filtroTexto').value.toUpperCase();
+      var estado = document.getElementById('filtroEstado').value;
+      var filas = document.querySelectorAll('.fila-item');
+
+      filas.forEach(function(fila) {
+        var idx = parseInt(fila.getAttribute('data-idx'));
+        var item = itemsMeli[idx];
+        var estadoFila = fila.getAttribute('data-estado');
+
+        var matchTexto = !texto ||
+          item.titulo.toUpperCase().indexOf(texto) !== -1 ||
+          (item.sku || '').toUpperCase().indexOf(texto) !== -1 ||
+          item.itemId.toUpperCase().indexOf(texto) !== -1;
+
+        var matchEstado = estado === 'todos' || estadoFila === estado;
+
+        fila.style.display = (matchTexto && matchEstado) ? '' : 'none';
+      });
+    }
+
+    // ============================================================
+    // EJECUTAR VINCULACION
+    // ============================================================
+    function ejecutarVinculacion() {
+      var keys = Object.keys(vinculaciones);
+      if (keys.length === 0) return;
+
+      var cambios = [];
+      keys.forEach(function(idx) {
+        var item = itemsMeli[parseInt(idx)];
+        cambios.push({
+          itemId: item.itemId,
+          variacionId: item.variacionId || null,
+          skuActual: item.sku || '',
+          skuNuevo: vinculaciones[idx],
+          titulo: item.titulo,
+          variante: item.variante || '(Sin variante)',
+          stock: item.stock || 0,
+          precio: item.precio || 0,
+          tipo: item.logisticType === 'fulfillment' ? 'Full' : 'Deposito'
+        });
+      });
+
+      var btn = document.getElementById('btnVincular');
+      btn.disabled = true;
+      btn.textContent = 'Vinculando...';
+
+      var progressBar = document.getElementById('progressBar');
+      var progressFill = document.getElementById('progressFill');
+      var progressText = document.getElementById('progressText');
+      progressBar.classList.add('visible');
+      progressText.classList.add('visible');
+      progressFill.style.width = '10%';
+      progressText.textContent = 'Actualizando SKUs en MercadoLibre... (0/' + cambios.length + ')';
+
+      google.script.run
+        .withSuccessHandler(function(resultados) {
+          progressFill.style.width = '100%';
+
+          var exitosos = resultados.filter(function(r) { return r.success; }).length;
+          var fallidos = resultados.filter(function(r) { return !r.success; }).length;
+
+          progressText.textContent = 'Completado: ' + exitosos + ' vinculados, ' + fallidos + ' con errores';
+
+          var html = '';
+          resultados.forEach(function(r) {
+            if (r.success) {
+              html += '<div class="resultado-item resultado-ok">' +
+                '<span style="font-size:18px;">✅</span> ' +
+                '<span style="flex:1;">' + escapeHtml(r.titulo) + '</span>' +
+                '<span style="font-weight:700;">' + escapeHtml(r.skuActual || '(vacío)') + ' → ' + escapeHtml(r.skuNuevo) + '</span></div>';
+            } else {
+              html += '<div class="resultado-item resultado-error">' +
+                '<span style="font-size:18px;">❌</span> ' +
+                '<span style="flex:1;">' + escapeHtml(r.titulo) + '</span>' +
+                '<span>' + escapeHtml(r.error) + '</span></div>';
+            }
+          });
+
+          document.getElementById('resultados').innerHTML = html;
+
+          // Actualizar la tabla localmente sin recargar todo desde MeLi
+          resultados.forEach(function(r) {
+            if (!r.success) return;
+            for (var j = 0; j < itemsMeli.length; j++) {
+              if (itemsMeli[j].itemId === r.itemId &&
+                  (!r.variacionId || itemsMeli[j].variacionId === r.variacionId)) {
+                itemsMeli[j].sku = r.skuNuevo;
+                break;
+              }
+            }
+          });
+
+          vinculaciones = {};
+          mostrarTabla();
+
+          btn.textContent = '✅ Vinculación completada — tabla actualizada';
+          btn.disabled = true;
+        })
+        .withFailureHandler(function(error) {
+          progressText.textContent = 'Error: ' + error.message;
+          btn.disabled = false;
+          btn.textContent = '🔗 Reintentar vinculación';
+        })
+        .ejecutarVinculacionWeb(cambios);
+    }
+
+    // ============================================================
+    // COMPOSICIONES (Combos y Packs)
+    // ============================================================
+
+    function comboKey(item) {
+      if (!item) return '';
+      return (item.itemId || '') + '|' + (item.variacionId || '');
+    }
+
+    function tieneCombo(item) {
+      if (!item) return false;
+      return !!composiciones[comboKey(item)];
+    }
+
+    function renderComboInfo(item) {
+      if (!item) return '';
+      var comps = composiciones[comboKey(item)];
+      if (!comps || comps.length === 0) return '';
+      var textos = [];
+      for (var c = 0; c < comps.length; c++) {
+        textos.push(comps[c].cantidad + 'x ' + comps[c].sku);
+      }
+      return '<div class="combo-info">📦 ' + textos.join(' + ') + '</div>';
+    }
+
+    function toggleComboPanel(idx) {
+      var panel = document.getElementById('combo-panel-' + idx);
+      if (panel.style.display === 'none') {
+        var item = itemsMeli[idx];
+        var clave = comboKey(item);
+        var existentes = composiciones[clave] || [];
+
+        var html = '<div class="combo-panel">';
+        html += '<div style="font-weight:600;margin-bottom:8px;">Componentes del combo/pack:</div>';
+        html += '<div id="combo-rows-' + idx + '">';
+
+        if (existentes.length > 0) {
+          for (var c = 0; c < existentes.length; c++) {
+            html += renderComboRow(idx, existentes[c].sku, existentes[c].cantidad);
+          }
+        } else {
+          html += renderComboRow(idx, '', 1);
+        }
+
+        html += '</div>';
+        html += '<button class="combo-btn-add" onclick="agregarComboRow(' + idx + ')">+ Agregar componente</button> ';
+        html += '<button class="combo-btn-save" onclick="guardarCombo(' + idx + ')">💾 Guardar composición</button>';
+        html += '<div id="combo-status-' + idx + '" style="margin-top:6px;font-size:12px;"></div>';
+        html += '</div>';
+
+        panel.innerHTML = html;
+        panel.style.display = 'block';
+      } else {
+        panel.style.display = 'none';
+      }
+    }
+
+    var comboRowCounter = 0;
+
+    function renderComboRow(idx, sku, cantidad) {
+      var rowId = 'cr-' + idx + '-' + (comboRowCounter++);
+      // Buscar nombre del producto para mostrar
+      var displayText = sku;
+      if (sku) {
+        for (var p = 0; p < productosTN.length; p++) {
+          if (productosTN[p].sku.toUpperCase() === sku.toUpperCase()) {
+            displayText = sku + ' — ' + productosTN[p].nombre;
+            if (productosTN[p].variante) displayText += ' (' + productosTN[p].variante + ')';
+            break;
+          }
+        }
+      }
+      return '<div class="combo-row" data-sku="' + escapeHtml(sku) + '">' +
+        '<div class="sku-selector-wrapper" style="flex:1;">' +
+          '<input type="text" class="combo-sku-input sku-selector-input' + (sku ? ' vinculado' : '') + '" ' +
+            'id="' + rowId + '" ' +
+            'placeholder="Buscar por SKU o nombre..." ' +
+            'value="' + escapeHtml(displayText) + '" ' +
+            'onfocus="abrirComboDropdown(\'' + rowId + '\')" ' +
+            'oninput="buscarComboSKU(\'' + rowId + '\')">' +
+          '<div class="sku-dropdown" id="dd-' + rowId + '"></div>' +
+        '</div>' +
+        '<input type="number" min="0.01" step="any" value="' + (cantidad || 1) + '" class="combo-cant-input" title="Cantidad (ej: 0.5 = mitad)">' +
+        '<button class="combo-btn-remove" onclick="this.parentElement.remove()">✕</button>' +
+        '</div>';
+    }
+
+    function agregarComboRow(idx) {
+      var container = document.getElementById('combo-rows-' + idx);
+      var div = document.createElement('div');
+      div.innerHTML = renderComboRow(idx, '', 1);
+      container.appendChild(div.firstChild);
+    }
+
+    function abrirComboDropdown(rowId) {
+      cerrarTodosComboDropdowns();
+      buscarComboSKU(rowId);
+    }
+
+    function cerrarTodosComboDropdowns() {
+      var dds = document.querySelectorAll('.combo-panel .sku-dropdown');
+      dds.forEach(function(d) { d.classList.remove('visible'); });
+    }
+
+    function buscarComboSKU(rowId) {
+      var input = document.getElementById(rowId);
+      var dropdown = document.getElementById('dd-' + rowId);
+      if (!input || !dropdown) return;
+
+      var query = input.value.toUpperCase().trim();
+      // Si el input tiene un " — " es porque ya se seleccionó, buscar solo por la parte antes del —
+      if (query.indexOf(' — ') !== -1) {
+        query = query.split(' — ')[0].trim();
+      }
+
+      var resultados = [];
+      for (var i = 0; i < productosTN.length; i++) {
+        var p = productosTN[i];
+        if (!query || p.sku.toUpperCase().indexOf(query) !== -1 ||
+            p.nombre.toUpperCase().indexOf(query) !== -1) {
+          resultados.push(p);
+          if (resultados.length >= 50) break;
+        }
+      }
+
+      if (resultados.length === 0) {
+        dropdown.innerHTML = '<div style="padding:10px;color:#999;font-size:12px;">Sin coincidencias</div>';
+      } else {
+        var html = '';
+        resultados.forEach(function(p) {
+          html += '<div class="sku-option" onmousedown="seleccionarComboSKU(\'' + rowId + '\', \'' + escapeJs(p.sku) + '\', \'' + escapeJs(p.nombre) + '\', \'' + escapeJs(p.variante || '') + '\')">' +
+            '<span class="sku-code">' + escapeHtml(p.sku) + '</span> ' +
+            '<span class="sku-name">' + escapeHtml(p.nombre) + '</span>' +
+            (p.variante ? ' <span style="color:#999;font-size:11px;">(' + escapeHtml(p.variante) + ')</span>' : '') +
+            '</div>';
+        });
+        dropdown.innerHTML = html;
+      }
+      dropdown.classList.add('visible');
+    }
+
+    function seleccionarComboSKU(rowId, sku, nombre, variante) {
+      var input = document.getElementById(rowId);
+      var display = sku + ' — ' + nombre;
+      if (variante) display += ' (' + variante + ')';
+      input.value = display;
+      input.classList.add('vinculado');
+      // Guardar el SKU real en el data-sku del combo-row
+      var row = input.closest('.combo-row');
+      if (row) row.setAttribute('data-sku', sku);
+      cerrarTodosComboDropdowns();
+    }
+
+    function guardarCombo(idx) {
+      var item = itemsMeli[idx];
+      if (!item.itemId) {
+        alert('Error: publicación sin ID de MeLi');
+        return;
+      }
+
+      var container = document.getElementById('combo-rows-' + idx);
+      cerrarTodosComboDropdowns();
+      var rows = container.querySelectorAll('.combo-row');
+      var componentes = [];
+
+      for (var r = 0; r < rows.length; r++) {
+        // Leer SKU del data-sku (guardado al seleccionar del dropdown)
+        var skuInput = (rows[r].getAttribute('data-sku') || '').trim();
+        // Si no hay data-sku, intentar leer del input (por si lo escribió a mano)
+        if (!skuInput) {
+          var inputVal = rows[r].querySelector('.combo-sku-input').value.trim();
+          // Si tiene " — " es que muestra nombre, tomar solo el SKU
+          if (inputVal.indexOf(' — ') !== -1) {
+            skuInput = inputVal.split(' — ')[0].trim();
+          } else {
+            skuInput = inputVal;
+          }
+        }
+        var cantInput = parseFloat(rows[r].querySelector('.combo-cant-input').value) || 1;
+        if (skuInput) {
+          componentes.push({ sku: skuInput, cantidad: cantInput });
+        }
+      }
+
+      var statusDiv = document.getElementById('combo-status-' + idx);
+      statusDiv.innerHTML = '<span style="color:#7b1fa2;">⏳ Guardando...</span>';
+
+      var publi = {
+        itemId: item.itemId,
+        variacionId: item.variacionId || '',
+        skuMeli: item.sku || ''
+      };
+      var clave = comboKey(item);
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            if (componentes.length > 0) {
+              composiciones[clave] = componentes;
+              statusDiv.innerHTML = '<span style="color:#2e7d32;">✅ Composición guardada (' + componentes.length + ' componentes)</span>';
+            } else {
+              delete composiciones[clave];
+              statusDiv.innerHTML = '<span style="color:#888;">Composición eliminada</span>';
+            }
+            // Actualizar el botón y la info en la fila
+            mostrarTabla();
+            filtrarTabla();
+          } else {
+            statusDiv.innerHTML = '<span style="color:#c62828;">❌ Error al guardar</span>';
+          }
+        })
+        .withFailureHandler(function(error) {
+          statusDiv.innerHTML = '<span style="color:#c62828;">❌ ' + (error.message || 'Error') + '</span>';
+        })
+        .guardarComposicion(publi, componentes);
+    }
+
+    // ============================================================
+    // UTILIDADES
+    // ============================================================
+    function escapeHtml(text) {
+      if (!text) return '';
+      var div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function escapeJs(text) {
+      return (text || '').replace(/'/g, "\\'").replace(/\\/g, "\\\\");
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+      background: #f0f2f5; min-height: 100vh; padding: 12px;
+    }
+    .container {
+      background: white; border-radius: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+      padding: 24px; max-width: 600px; width: 100%; margin: 0 auto;
+    }
+    .header { text-align: center; margin-bottom: 20px; }
+    .header h1 {
+      color: #FFE600; font-size: 20px; background: #2D3277;
+      padding: 12px; border-radius: 10px; margin-bottom: 4px;
+    }
+    .header p { color: #888; font-size: 13px; margin-top: 6px; }
+
+    /* Buscador con autocomplete */
+    .search-container { position: relative; margin-bottom: 20px; }
+    .search-box { display: flex; gap: 8px; }
+    .search-box input {
+      flex: 1; padding: 12px 16px; font-size: 16px; border: 2px solid #ddd;
+      border-radius: 10px; outline: none; transition: border-color 0.2s;
+    }
+    .search-box input:focus { border-color: #2D3277; }
+    .btn {
+      padding: 12px 24px; font-size: 15px; font-weight: 600; border: none;
+      border-radius: 10px; cursor: pointer; transition: background 0.2s;
+    }
+    .btn-meli { background: #2D3277; color: white; }
+    .btn-meli:hover { background: #1a1f5e; }
+    .btn-meli:disabled { background: #aaa; cursor: not-allowed; }
+
+    /* Dropdown autocomplete */
+    .autocomplete-list {
+      position: absolute; top: 100%; left: 0; right: 0; background: white;
+      border: 2px solid #2D3277; border-top: none; border-radius: 0 0 10px 10px;
+      max-height: 350px; overflow-y: auto; z-index: 100; display: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15); -webkit-overflow-scrolling: touch;
+    }
+    .autocomplete-list.visible { display: block; }
+    .autocomplete-item {
+      display: flex; gap: 10px; padding: 10px 14px; cursor: pointer;
+      border-bottom: 1px solid #f0f0f0; align-items: center; transition: background 0.1s;
+    }
+    .autocomplete-item:last-child { border-bottom: none; }
+    .autocomplete-item:hover, .autocomplete-item.highlighted { background: #f0f4ff; }
+    .autocomplete-img { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+    .autocomplete-info { flex: 1; min-width: 0; }
+    .autocomplete-title {
+      font-size: 13px; color: #333; display: -webkit-box;
+      -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .autocomplete-meta { font-size: 11px; color: #888; margin-top: 2px; display: flex; gap: 8px; }
+    .autocomplete-stock { font-weight: 600; }
+    .autocomplete-badge {
+      font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px;
+    }
+    .badge-full { background: #e8f5e9; color: #2e7d32; }
+    .badge-deposito { background: #e3f2fd; color: #1565c0; }
+    .autocomplete-loading { padding: 16px; text-align: center; color: #888; font-size: 13px; }
+    .autocomplete-empty { padding: 16px; text-align: center; color: #999; font-size: 13px; }
+
+    .loading { text-align: center; padding: 40px; color: #666; display: none; }
+    .loading.active { display: block; }
+    .spinner {
+      display: inline-block; width: 32px; height: 32px; border: 3px solid #ddd;
+      border-top-color: #2D3277; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .result { display: none; }
+    .result.active { display: block; }
+
+    /* Resumen de stock */
+    .stock-summary { display: flex; gap: 10px; margin-bottom: 20px; }
+    .stock-card { flex: 1; border-radius: 12px; padding: 16px; text-align: center; }
+    .stock-card .number { font-size: 32px; font-weight: 800; }
+    .stock-card .label { font-size: 12px; font-weight: 600; margin-top: 4px; }
+    .card-deposito { background: #e3f2fd; }
+    .card-deposito .number { color: #1565c0; }
+    .card-deposito .label { color: #1976d2; }
+    .card-full { background: #e8f5e9; }
+    .card-full .number { color: #2e7d32; }
+    .card-full .label { color: #388e3c; }
+    .card-total { background: #f3e5f5; }
+    .card-total .number { color: #7b1fa2; }
+    .card-total .label { color: #8e24aa; }
+
+    /* Secciones deposito / full */
+    .section-title {
+      font-size: 15px; font-weight: 700; padding: 8px 12px; border-radius: 8px;
+      margin: 16px 0 10px 0; display: flex; align-items: center; gap: 8px;
+    }
+    .section-deposito { background: #e3f2fd; color: #1565c0; }
+    .section-full { background: #e8f5e9; color: #2e7d32; }
+
+    /* Publicacion */
+    .pub-card {
+      border: 1px solid #e0e0e0; border-radius: 10px; padding: 12px;
+      margin-bottom: 8px; display: flex; gap: 10px;
+    }
+    .pub-img { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
+    .pub-info { flex: 1; min-width: 0; }
+    .pub-title {
+      font-size: 13px; color: #333; margin-bottom: 4px;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .pub-title a { color: #2D3277; text-decoration: none; }
+    .pub-title a:hover { text-decoration: underline; }
+    .pub-price { font-size: 15px; font-weight: 700; color: #333; }
+    .pub-meta { font-size: 12px; color: #888; display: flex; gap: 10px; flex-wrap: wrap; margin-top: 3px; }
+    .pub-stock { font-weight: 600; }
+    .stock-ok { color: #2e7d32; }
+    .stock-low { color: #e8710a; }
+    .stock-zero { color: #c62828; }
+    .pub-id { color: #bbb; font-size: 11px; }
+
+    /* Variaciones */
+    .var-list { margin-top: 6px; padding-top: 6px; border-top: 1px solid #f0f0f0; }
+    .var-row {
+      display: flex; justify-content: space-between; font-size: 12px;
+      padding: 3px 0; color: #666;
+    }
+    .var-name { flex: 1; }
+    .var-stock { font-weight: 600; min-width: 50px; text-align: right; }
+    .var-sku { color: #aaa; min-width: 80px; text-align: right; font-size: 11px; }
+
+    .no-result { text-align: center; padding: 40px 16px; color: #666; }
+    .no-result .icon { font-size: 40px; margin-bottom: 12px; }
+
+    .error-msg {
+      background: #ffebee; color: #c62828; padding: 12px 16px;
+      border-radius: 8px; font-size: 14px; display: none;
+    }
+    .error-msg.active { display: block; }
+
+    .nav-links { text-align: center; margin-top: 20px; padding-top: 14px; border-top: 1px solid #eee; }
+    .nav-links a { color: #2D3277; text-decoration: none; font-size: 13px; margin: 0 8px; }
+
+    @media (max-width: 400px) {
+      .container { padding: 16px; }
+      .stock-summary { flex-direction: column; }
+      .pub-img { width: 50px; height: 50px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Consultar Stock MeLi</h1>
+      <p>Stock por publicacion — Deposito vs Full</p>
+    </div>
+
+    <div class="search-container">
+      <div class="search-box">
+        <input type="text" id="skuInput" placeholder="Busca por titulo, SKU o codigo MLA..." autocomplete="off" autofocus>
+        <button class="btn btn-meli" id="btnConsultar" onclick="consultarSeleccionado()">Consultar</button>
+      </div>
+      <div class="autocomplete-list" id="autocompleteList"></div>
+    </div>
+
+    <div class="error-msg" id="errorMsg"></div>
+
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <p>Buscando en MercadoLibre...</p>
+    </div>
+
+    <div class="result" id="result"></div>
+
+    <div class="nav-links">
+      <a href="?page=mercadolibre">Panel MeLi</a>
+      <a href="?page=consultar">Stock TiendaNube</a>
+      <a href="?page=formulariov2">Cargar stock</a>
+    </div>
+  </div>
+
+  <script>
+    var debounceTimer = null;
+    var highlightedIndex = -1;
+    var autocompleteData = [];
+    var buscando = false;
+
+    var input = document.getElementById('skuInput');
+    var listEl = document.getElementById('autocompleteList');
+
+    // Debounce: buscar mientras escribe
+    input.addEventListener('input', function() {
+      var query = this.value.trim();
+      highlightedIndex = -1;
+
+      if (query.length < 3) {
+        listEl.classList.remove('visible');
+        autocompleteData = [];
+        return;
+      }
+
+      // Mostrar "buscando..."
+      listEl.innerHTML = '<div class="autocomplete-loading"><div class="spinner" style="width:20px;height:20px;border-width:2px;margin:0 8px 0 0;vertical-align:middle;display:inline-block;"></div> Buscando...</div>';
+      listEl.classList.add('visible');
+
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(function() {
+        buscando = true;
+        google.script.run
+          .withSuccessHandler(mostrarAutocomplete)
+          .withFailureHandler(function(e) {
+            listEl.innerHTML = '<div class="autocomplete-empty">Error: ' + e.message + '</div>';
+            buscando = false;
+          })
+          .buscarMeliRapido(query);
+      }, 600);
+    });
+
+    // Navegacion con teclado
+    input.addEventListener('keydown', function(e) {
+      var items = listEl.querySelectorAll('.autocomplete-item');
+      if (e.key === 'ArrowDown' && items.length > 0) {
+        e.preventDefault();
+        highlightedIndex = Math.min(highlightedIndex + 1, items.length - 1);
+        updateHighlight(items);
+      } else if (e.key === 'ArrowUp' && items.length > 0) {
+        e.preventDefault();
+        highlightedIndex = Math.max(highlightedIndex - 1, 0);
+        updateHighlight(items);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (highlightedIndex >= 0 && items.length > 0) {
+          items[highlightedIndex].click();
+        } else {
+          consultarSeleccionado();
+        }
+      } else if (e.key === 'Escape') {
+        listEl.classList.remove('visible');
+      }
+    });
+
+    function updateHighlight(items) {
+      items.forEach(function(item, i) { item.classList.toggle('highlighted', i === highlightedIndex); });
+      if (highlightedIndex >= 0) items[highlightedIndex].scrollIntoView({ block: 'nearest' });
+    }
+
+    // Cerrar al clickear afuera
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.search-container')) {
+        listEl.classList.remove('visible');
+      }
+    });
+
+    // Mostrar autocomplete
+    function mostrarAutocomplete(resultados) {
+      buscando = false;
+      autocompleteData = resultados;
+      highlightedIndex = -1;
+
+      if (resultados.length === 0) {
+        listEl.innerHTML = '<div class="autocomplete-empty">No se encontraron publicaciones</div>';
+        listEl.classList.add('visible');
+        return;
+      }
+
+      var html = '';
+      for (var i = 0; i < resultados.length; i++) {
+        var r = resultados[i];
+        var stockClass = r.stock === 0 ? 'stock-zero' : (r.stock <= 3 ? 'stock-low' : 'stock-ok');
+        var badgeClass = r.tipoEnvio === 'Full' ? 'badge-full' : 'badge-deposito';
+        var imgSrc = r.imagen ? r.imagen.replace('http:', 'https:') : '';
+
+        html += '<div class="autocomplete-item" data-index="' + i + '" onclick="seleccionarPublicacion(' + i + ')">';
+        if (imgSrc) html += '<img class="autocomplete-img" src="' + imgSrc + '" alt="">';
+        html += '<div class="autocomplete-info">';
+        html += '<div class="autocomplete-title">' + escapeHtml(r.titulo) + '</div>';
+        html += '<div class="autocomplete-meta">';
+        html += '<span class="autocomplete-stock ' + stockClass + '">Stock: ' + r.stock + '</span>';
+        html += '<span>$' + formatNumber(r.precio) + '</span>';
+        html += '<span class="autocomplete-badge ' + badgeClass + '">' + r.tipoEnvio + '</span>';
+        html += '<span style="color:#bbb;">' + r.id + '</span>';
+        html += '</div></div></div>';
+      }
+
+      listEl.innerHTML = html;
+      listEl.classList.add('visible');
+    }
+
+    // Seleccionar publicacion del autocomplete
+    function seleccionarPublicacion(index) {
+      var pub = autocompleteData[index];
+      if (!pub) return;
+
+      listEl.classList.remove('visible');
+
+      // Usar el texto original del buscador (el SKU) para encontrar TODAS las publicaciones
+      var queryOriginal = input.value.trim();
+      input.value = pub.titulo;
+
+      document.getElementById('btnConsultar').disabled = true;
+      document.getElementById('loading').className = 'loading active';
+      document.getElementById('result').className = 'result';
+      document.getElementById('errorMsg').className = 'error-msg';
+
+      // Buscar con el SKU original para traer Deposito + Full
+      google.script.run
+        .withSuccessHandler(mostrarResultado)
+        .withFailureHandler(mostrarError)
+        .consultarStockMeliBySKU(queryOriginal || pub.id);
+    }
+
+    // Consultar con texto libre
+    function consultarSeleccionado() {
+      var query = input.value.trim();
+      if (!query) { input.focus(); return; }
+
+      listEl.classList.remove('visible');
+      document.getElementById('btnConsultar').disabled = true;
+      document.getElementById('loading').className = 'loading active';
+      document.getElementById('result').className = 'result';
+      document.getElementById('errorMsg').className = 'error-msg';
+
+      google.script.run
+        .withSuccessHandler(mostrarResultado)
+        .withFailureHandler(mostrarError)
+        .consultarStockMeliBySKU(query);
+    }
+
+    function mostrarResultado(data) {
+      document.getElementById('btnConsultar').disabled = false;
+      document.getElementById('loading').className = 'loading';
+      var container = document.getElementById('result');
+
+      if (!data.encontrado) {
+        container.innerHTML =
+          '<div class="no-result">' +
+            '<div class="icon">&#128269;</div>' +
+            '<p>No se encontro <strong>' + escapeHtml(data.sku) + '</strong> en MercadoLibre</p>' +
+          '</div>';
+        container.className = 'result active';
+        return;
+      }
+
+      var html = '';
+
+      // Resumen general
+      html += '<div class="stock-summary">';
+      html += '<div class="stock-card card-deposito"><div class="number">' + data.stockDeposito + '</div><div class="label">DEPOSITO</div></div>';
+      html += '<div class="stock-card card-full"><div class="number">' + data.stockFull + '</div><div class="label">FULL</div></div>';
+      html += '<div class="stock-card card-total"><div class="number">' + data.stockTotal + '</div><div class="label">TOTAL</div></div>';
+      html += '</div>';
+
+      // Publicaciones
+      for (var i = 0; i < data.publicaciones.length; i++) {
+        html += renderPublicacion(data.publicaciones[i]);
+      }
+
+      container.innerHTML = html;
+      container.className = 'result active';
+    }
+
+    function renderPublicacion(p) {
+      var stockClass = 'stock-ok';
+      if (p.stockTotal === 0) stockClass = 'stock-zero';
+      else if (p.stockTotal <= 3) stockClass = 'stock-low';
+
+      var html = '<div class="pub-card" style="flex-direction:column;">';
+
+      // Header con imagen y titulo
+      html += '<div style="display:flex;gap:10px;">';
+      if (p.imagen) html += '<img class="pub-img" src="' + p.imagen.replace('http:', 'https:') + '" alt="">';
+      html += '<div class="pub-info">';
+      html += '<div class="pub-title"><a href="' + p.link + '" target="_blank">' + escapeHtml(p.titulo) + '</a></div>';
+      html += '<div class="pub-price">$' + formatNumber(p.precio) + '</div>';
+      html += '<div class="pub-meta">';
+      html += '<span class="pub-stock ' + stockClass + '">Stock total: ' + p.stockTotal + '</span>';
+      html += '<span>Vendidos: ' + p.vendidos + '</span>';
+      html += '<span class="pub-id">' + p.id + '</span>';
+      html += '</div>';
+      html += '</div></div>';
+
+      // Stock por ubicacion de la publicacion
+      html += '<div style="display:flex;gap:8px;margin-top:10px;">';
+      html += '<div style="flex:1;background:#e3f2fd;border-radius:8px;padding:8px;text-align:center;">';
+      html += '<div style="font-size:20px;font-weight:800;color:#1565c0;">' + p.stockDeposito + '</div>';
+      html += '<div style="font-size:11px;color:#1976d2;font-weight:600;">Deposito</div></div>';
+      html += '<div style="flex:1;background:#e8f5e9;border-radius:8px;padding:8px;text-align:center;">';
+      html += '<div style="font-size:20px;font-weight:800;color:#2e7d32;">' + p.stockFull + '</div>';
+      html += '<div style="font-size:11px;color:#388e3c;font-weight:600;">Full</div></div>';
+      html += '</div>';
+
+      // Variaciones con stock por ubicacion
+      if (p.variaciones.length > 0) {
+        html += '<div class="var-list">';
+        // Header de variaciones
+        html += '<div class="var-row" style="font-weight:700;color:#333;font-size:11px;text-transform:uppercase;padding-bottom:6px;">';
+        html += '<span class="var-name">Variante</span>';
+        html += '<span style="min-width:45px;text-align:center;color:#1565c0;">Depo</span>';
+        html += '<span style="min-width:45px;text-align:center;color:#2e7d32;">Full</span>';
+        html += '<span style="min-width:45px;text-align:center;color:#666;">Total</span>';
+        html += '</div>';
+        for (var v = 0; v < p.variaciones.length; v++) {
+          var va = p.variaciones[v];
+          var vTotal = va.stockDeposito + va.stockFull;
+          var vTotalClass = vTotal === 0 ? 'stock-zero' : (vTotal <= 3 ? 'stock-low' : 'stock-ok');
+          html += '<div class="var-row">';
+          html += '<span class="var-name">' + escapeHtml(va.nombre);
+          if (va.sku) html += ' <span style="color:#bbb;font-size:10px;">(' + escapeHtml(va.sku) + ')</span>';
+          html += '</span>';
+          html += '<span style="min-width:45px;text-align:center;font-weight:600;color:#1565c0;">' + va.stockDeposito + '</span>';
+          html += '<span style="min-width:45px;text-align:center;font-weight:600;color:#2e7d32;">' + va.stockFull + '</span>';
+          html += '<span class="var-stock ' + vTotalClass + '" style="min-width:45px;text-align:center;">' + vTotal + '</span>';
+          html += '</div>';
+        }
+        html += '</div>';
+      }
+
+      html += '</div>';
+      return html;
+    }
+
+    function mostrarError(error) {
+      document.getElementById('btnConsultar').disabled = false;
+      document.getElementById('loading').className = 'loading';
+      var msg = document.getElementById('errorMsg');
+      msg.textContent = error.message || 'Error desconocido';
+      msg.className = 'error-msg active';
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function formatNumber(n) {
+      if (n === null || n === undefined) return '0';
+      return Number(n).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    }
+  </script>
+</body>
+</html>
