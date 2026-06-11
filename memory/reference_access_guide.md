@@ -52,11 +52,43 @@ service = build('sheets', 'v4', credentials=creds)
 - **Acceso público**: WebFetch a https://www.mercadolibre.com.ar/pagina/tutextilhogaryhotel
 - **API**: Requiere OAuth — pendiente de configurar en developers.mercadolibre.com.ar
 
+## APIs CONFIGURADAS (continuación)
+
+### Google Analytics Data API (GA4) ✅ ACTIVA (configurada 10-jun-2026)
+- **Método**: API REST con la MISMA cuenta de servicio que Sheets
+- **Property ID GA4**: 328969480 (de a107376290p328969480)
+- **Credenciales**: `data/google_credentials.json` (cuenta claudio@claudio-491623.iam.gserviceaccount.com con rol Lector en la propiedad)
+- **API habilitada** en proyecto claudio-491623 + cuenta de servicio agregada como Lector en GA4 Admin
+- **Librería**: `pip install google-analytics-data`
+- **Script listo**: `tools/ventas_por_canal.py` — ventas de la tienda por canal/fuente
+  - `python tools/ventas_por_canal.py` → últimos 30 días
+  - `python tools/ventas_por_canal.py 2026-05-12 2026-06-10` → rango específico
+- **Para aislar Google Ads**: dimensión `sessionSourceMedium` = "google / cpc"
+  - OJO: en grupo de canal, PMax cae en "Cross-network" y BRAND Search en "Paid Search";
+    "Paid Social" = Instagram/Facebook Ads (Meta), NO Google. Por eso conviene usar source/medium.
+- **Métricas útiles**: sessions, transactions, totalRevenue, purchaseRevenue
+- **Dimensiones útiles**: sessionDefaultChannelGroup, sessionSourceMedium, sessionCampaignName
+
+### Google Ads — datos vía GA4 ✅ (NO hace falta la API de Google Ads)
+- Google Ads ESTÁ vinculado a GA4, así que las métricas de campañas (costo, clics,
+  impresiones, CPC, ventas, ingresos, ROAS) salen de la API GA4 ya configurada.
+- **NO se configuró la API oficial de Google Ads** (evita el trámite del developer token).
+- **Script listo**: `tools/google_ads_campanas.py` — estado de campañas de Google Ads
+  - `python tools/google_ads_campanas.py 2026-05-12 2026-06-10`
+- Costo/clics/impresiones = exactos (vienen de Ads). Ventas/ROAS = atribución real de la tienda.
+- **Lo que GA4 NO da** (para eso, panel web de Google Ads o CSV ocasional):
+  - "% impresiones perdidas por presupuesto" (saber si una campaña está limitada por presupuesto)
+  - Cambiar presupuestos / pausar campañas (decisiones que toma Maru en el panel)
+- Dimensiones Ads en GA4: sessionGoogleAdsCampaignName, googleAdsCampaignId, etc.
+- Métricas Ads en GA4: advertiserAdCost, advertiserAdClicks, advertiserAdImpressions,
+  advertiserAdCostPerClick, returnOnAdSpend
+
 ## PLATAFORMAS GOOGLE (solo via Claude in Chrome)
 
-### 4. Google Analytics
+### 4. Google Analytics (panel web)
 - **URL directa**: https://analytics.google.com/analytics/web/#/a107376290p328969480/reports/intelligenthome
 - **ID propiedad**: a107376290p328969480
+- (Para datos: usar la API GA4 de arriba, más rápido)
 
 ### 5. Google Ads
 - **URL directa**: https://ads.google.com/nav/login?ocid=232988373&uscid=232988373
