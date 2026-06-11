@@ -1,0 +1,762 @@
+{% extends "base.html" %}
+
+{% block title %}Pedido {{ pedido.mes | mes_nombre }} {{ pedido.anio }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Resultados de búsqueda */
+    #resultadosBusqueda {
+        max-height: 400px; overflow-y: auto;
+        border: 1px solid #dee2e6; border-radius: 6px;
+        display: none; background: white;
+    }
+    .producto-resultado {
+        padding: 6px 12px; border-bottom: 1px solid #f0f0f0;
+        cursor: pointer; display: flex; align-items: center; gap: 8px;
+        font-size: 0.9rem;
+    }
+    .producto-resultado:hover { background: #f0f4ff; }
+    .producto-resultado.checked { background: #d4edda; }
+    .producto-resultado input[type=checkbox] { flex-shrink: 0; width: 18px; height: 18px; cursor: pointer; }
+    .producto-resultado .desc { font-weight: 500; flex: 1; }
+    .producto-resultado .meta { font-size: 0.75rem; color: #888; }
+
+    /* Familia resultado */
+    .familia-resultado {
+        padding: 8px 12px; border-bottom: 1px solid #f0f0f0;
+        cursor: pointer; display: flex; align-items: center; gap: 8px;
+        background: #fff8e1;
+    }
+    .familia-resultado:hover { background: #fff3cd; }
+    .familia-resultado.checked { background: #c8e6c9; }
+    .familia-resultado input[type=checkbox] { flex-shrink: 0; width: 18px; height: 18px; cursor: pointer; }
+
+    /* Seleccionados */
+    #seleccionados { display: none; }
+    .sel-item {
+        background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px;
+        padding: 8px 12px; margin-bottom: 6px;
+        display: grid; grid-template-columns: 1fr 110px 180px 200px 40px;
+        gap: 8px; align-items: center;
+    }
+    .sel-item .nombre { font-weight: 500; font-size: 0.9rem; }
+    .sel-item .meta-small { font-size: 0.75rem; color: #888; }
+    .sel-item input, .sel-item select { font-size: 0.85rem; }
+    .btn-quitar { border: none; background: none; color: #dc3545; cursor: pointer; font-size: 1.1rem; }
+    .btn-quitar:hover { color: #a71d2a; }
+
+    /* Contador de seleccionados */
+    .sel-count { font-weight: bold; font-size: 1.1rem; }
+
+    /* Items del pedido */
+    .item-row { transition: background 0.2s; }
+    .item-row:hover { background: rgba(0,0,0,0.02); }
+    .cat-header { background: #e9ecef; font-weight: 600; }
+
+    .tab-deposito .nav-link { font-weight: 600; font-size: 1.1rem; }
+    .tab-deposito .nav-link.active[data-deposito="tucuman"] { background-color: var(--color-tucuman); border-color: var(--color-tucuman); }
+    .tab-deposito .nav-link.active[data-deposito="alsina"] { background-color: var(--color-alsina); border-color: var(--color-alsina); }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Header del pedido -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">
+            {{ pedido.mes | mes_nombre }} {{ pedido.anio }}
+            {% if pedido.tipo == 'parcial' %}
+                <span class="badge bg-info text-dark">{{ pedido | etiqueta_tipo }}</span>
+            {% else %}
+                <span class="badge bg-primary">Total</span>
+            {% endif %}
+            {% if pedido.estado == 'sin_finalizar' %}
+                <span class="badge bg-warning text-dark"><i class="bi bi-pencil"></i> Sin finalizar</span>
+            {% else %}
+                <span class="badge bg-success"><i class="bi bi-check"></i> Finalizado</span>
+            {% endif %}
+            <button class="btn btn-sm btn-link text-muted p-0 ms-1" data-bs-toggle="modal" data-bs-target="#editarInfoModal" title="Editar mes/tipo">
+                <i class="bi bi-pencil-square"></i>
+            </button>
+        </h2>
+        <small class="text-muted">
+            <i class="bi bi-calendar-event"></i> Pedido realizado el <strong>{{ pedido.fecha_pedido | fecha_legible }}</strong>
+            · Actualizado: {{ pedido.updated_at }}
+        </small>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/pedido/{{ pedido.id }}/resumen" class="btn btn-outline-primary">
+            <i class="bi bi-list-check"></i> Resumen
+        </a>
+        <a href="/pedido/{{ pedido.id }}/exportar" class="btn btn-outline-success">
+            <i class="bi bi-file-earmark-excel"></i> Excel
+        </a>
+        {% if pedido.estado == 'sin_finalizar' %}
+            <form method="POST" action="/pedido/{{ pedido.id }}/estado" class="d-inline">
+                <input type="hidden" name="estado" value="finalizado">
+                <button type="submit" class="btn btn-success" onclick="return confirm('¿Marcar como FINALIZADO? Lo podés reabrir después si necesitás.')">
+                    <i class="bi bi-check-circle"></i> Finalizar
+                </button>
+            </form>
+        {% else %}
+            <form method="POST" action="/pedido/{{ pedido.id }}/estado" class="d-inline">
+                <input type="hidden" name="estado" value="sin_finalizar">
+                <button type="submit" class="btn btn-outline-warning">
+                    <i class="bi bi-arrow-counterclockwise"></i> Reabrir (sin finalizar)
+                </button>
+            </form>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal editar info del pedido -->
+<div class="modal fade" id="editarInfoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="/pedido/{{ pedido.id }}/editar-info">
+                <div class="modal-header">
+                    <h5 class="modal-title">Editar datos del pedido</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-7">
+                            <label class="form-label fw-bold">Mes</label>
+                            <select name="mes" class="form-select">
+                                {% for num, nombre in meses.items() %}
+                                    <option value="{{ num }}" {% if num == pedido.mes %}selected{% endif %}>{{ nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-5">
+                            <label class="form-label fw-bold">Año</label>
+                            <input type="number" name="anio" class="form-control" value="{{ pedido.anio }}" min="2024" max="2030">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Fecha del pedido</label>
+                        <input type="date" name="fecha_pedido" class="form-control" value="{{ pedido.fecha_pedido }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Tipo de pedido</label>
+                        <div class="d-flex gap-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="tipo" value="total" id="editTotal"
+                                       {% if pedido.tipo == 'total' %}checked{% endif %}>
+                                <label class="form-check-label" for="editTotal">Total (el grande del mes)</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="tipo" value="parcial" id="editParcial"
+                                       {% if pedido.tipo == 'parcial' %}checked{% endif %}>
+                                <label class="form-check-label" for="editParcial">Parcial (durante el mes)</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Notas generales</label>
+                        <textarea name="notas" class="form-control" rows="2">{{ pedido.notas or '' }}</textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% if pedido.estado == 'sin_finalizar' %}
+<!-- ── AGREGAR PRODUCTOS ─────────────────────────────────── -->
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="mb-3"><i class="bi bi-plus-circle"></i> Agregar productos al pedido</h5>
+
+        <!-- Tabs: Catálogo / Manual -->
+        <ul class="nav nav-tabs mb-3" id="modoTab">
+            <li class="nav-item">
+                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabCatalogo">
+                    <i class="bi bi-search"></i> Buscar del catálogo
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabManual">
+                    <i class="bi bi-pencil-square"></i> Cargar manual
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content">
+            <!-- ═══ Tab Catálogo ═══ -->
+            <div class="tab-pane fade show active" id="tabCatalogo">
+                <!-- Barra de búsqueda -->
+                <div class="row g-2 mb-2">
+                    <div class="col-md-5">
+                        <input type="text" id="productoSearch" class="form-control form-control-lg"
+                               placeholder="Buscar por nombre, modelo, código o EAN..." autocomplete="off">
+                    </div>
+                    <div class="col-md-3">
+                        <select id="filtroCat" class="form-select form-select-lg">
+                            <option value="">Todas las categorías</option>
+                            {% for c in categorias %}
+                                <option value="{{ c.categoria }}">{{ categorias_display.get(c.categoria, c.categoria) }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select id="filtroLinea" class="form-select form-select-lg">
+                            <option value="">Todas las líneas</option>
+                        </select>
+                    </div>
+                    <div class="col-md-1 d-flex align-items-center">
+                        <span class="sel-count text-success" id="contadorSel">0</span>
+                        <small class="text-muted ms-1">sel.</small>
+                    </div>
+                </div>
+
+                <!-- Lista de resultados con checkboxes -->
+                <div id="resultadosBusqueda"></div>
+
+                <!-- Productos seleccionados (grilla de edición) -->
+                <div id="seleccionados" class="mt-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0"><i class="bi bi-check2-square"></i> Seleccionados — completá cantidad y detalle:</h6>
+                        <div class="d-flex gap-2">
+                            <select id="destinoGlobal" class="form-select form-select-sm" style="width:140px">
+                                <option value="tucuman">Tucumán</option>
+                                <option value="alsina">Alsina</option>
+                            </select>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="aplicarDestinoATodos()">
+                                Aplicar destino a todos
+                            </button>
+                        </div>
+                    </div>
+                    <div id="listaSeleccionados"></div>
+                    <div class="d-flex gap-2 mt-3">
+                        <button class="btn btn-primary btn-lg flex-fill" onclick="guardarTodos()">
+                            <i class="bi bi-plus-circle"></i> Agregar <span id="btnCount">0</span> productos al pedido
+                        </button>
+                        <button class="btn btn-outline-secondary" onclick="limpiarSeleccion()">
+                            <i class="bi bi-x-circle"></i> Limpiar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ Tab Manual ═══ -->
+            <div class="tab-pane fade" id="tabManual">
+                <form method="POST" action="/pedido/{{ pedido.id }}/agregar" class="row g-2 align-items-end">
+                    <input type="hidden" name="es_manual" value="1">
+                    <div class="col-md-2">
+                        <label class="form-label">Destino</label>
+                        <select name="destino" class="form-select">
+                            <option value="tucuman">Tucumán</option>
+                            <option value="alsina">Alsina</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Categoría</label>
+                        <select name="categoria_manual" class="form-select">
+                            <option value="">Detectar automáticamente</option>
+                            {% for c in categorias %}
+                                <option value="{{ c.categoria }}">{{ categorias_display.get(c.categoria, c.categoria) }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Código (opcional)</label>
+                        <input type="text" name="codigo_manual" class="form-control" placeholder="SKU si tenés">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Descripción *</label>
+                        <input type="text" name="descripcion_manual" class="form-control" required
+                               placeholder="ej: Toallón Fantasia Knut surtido">
+                    </div>
+                    <div class="col-md-1">
+                        <label class="form-label">Cant.</label>
+                        <input type="number" name="cantidad" class="form-control" min="0" value="0">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Colores / Detalle</label>
+                        <input type="text" name="color_detalle" class="form-control" placeholder="Colores...">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Notas</label>
+                        <input type="text" name="notas" class="form-control" placeholder="Aclaraciones...">
+                    </div>
+                    <div class="col-12 mt-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-plus"></i> Agregar Item Manual
+                        </button>
+                        <small class="text-muted ms-2">Si dejás la categoría en "Detectar automáticamente", la deduce de la descripción (ej: "Toallón..." → Toallones)</small>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ── ITEMS DEL PEDIDO ──────────────────────────────────── -->
+<ul class="nav nav-pills tab-deposito mb-3" id="depositoTabs">
+    <li class="nav-item">
+        <button class="nav-link active" data-deposito="tucuman" data-bs-toggle="pill" data-bs-target="#paneTucuman">
+            <i class="bi bi-shop"></i> Tucumán - Sergio
+            <span class="badge bg-light text-dark ms-1">{{ items_tucuman | length }}</span>
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-deposito="alsina" data-bs-toggle="pill" data-bs-target="#paneAlsina">
+            <i class="bi bi-building"></i> Alsina - Alberto
+            <span class="badge bg-light text-dark ms-1">{{ items_alsina | length }}</span>
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content">
+    {% for destino_key, items_list, dest_label in [('tucuman', items_tucuman, 'TUCUMÁN'), ('alsina', items_alsina, 'ALSINA')] %}
+    <div class="tab-pane fade {{ 'show active' if destino_key == 'tucuman' }}" id="pane{{ destino_key | title }}">
+        {% if items_list %}
+            {% set ns = namespace(current_cat='') %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-items">
+                        <tr>
+                            <th>Producto</th>
+                            <th>Colores</th>
+                            <th style="width:100px">Cant.</th>
+                            <th>Notas</th>
+                            <th style="width:140px">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items_list %}
+                            {% set cat = item.prod_categoria or 'manual' %}
+                            {% if cat != ns.current_cat %}
+                                {% set ns.current_cat = cat %}
+                                <tr class="cat-header">
+                                    <td colspan="5">{{ categorias_display.get(cat, cat | title) | upper }}</td>
+                                </tr>
+                            {% endif %}
+                            <tr class="item-row">
+                                <td>
+                                    {% if item.es_manual %}
+                                        <i class="bi bi-pencil-square text-muted"></i>
+                                        <strong>{{ item.descripcion_manual }}</strong>
+                                        {% if item.codigo_manual %}
+                                            <br><small class="text-muted">{{ item.codigo_manual }}</small>
+                                        {% endif %}
+                                    {% else %}
+                                        <strong>{{ item.prod_descripcion }}</strong>
+                                        <br><small class="text-muted">
+                                            {% if item.prod_sku %}<span class="badge bg-dark">{{ item.prod_sku }}</span>{% endif %}
+                                            {% if item.prod_mla %}{% for mla in item.prod_mla.split(',') %}<a href="https://www.mercadolibre.com.ar/p/{{ mla }}" target="_blank" class="badge bg-warning text-dark text-decoration-none">{{ mla }}</a> {% endfor %}{% endif %}
+                                            EAN: {{ item.prod_ean or '-' }}
+                                        </small>
+                                    {% endif %}
+                                </td>
+                                <td>{{ item.color_detalle or '-' }}</td>
+                                <td>
+                                    {% if pedido.estado == 'sin_finalizar' %}
+                                    <form method="POST" action="/pedido/{{ pedido.id }}/item/{{ item.id }}/editar" class="d-inline">
+                                        <input type="hidden" name="color_detalle" value="{{ item.color_detalle or '' }}">
+                                        <input type="hidden" name="notas" value="{{ item.notas or '' }}">
+                                        <input type="number" name="cantidad" value="{{ item.cantidad }}"
+                                               class="form-control form-control-sm" style="width:80px"
+                                               min="0" onchange="this.form.submit()">
+                                    </form>
+                                    {% else %}
+                                        <strong>{{ item.cantidad }}</strong>
+                                    {% endif %}
+                                </td>
+                                <td><small>{{ item.notas or '' }}</small></td>
+                                <td>
+                                    {% if pedido.estado == 'sin_finalizar' %}
+                                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal"
+                                            data-bs-target="#editModal{{ item.id }}">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <form method="POST" action="/pedido/{{ pedido.id }}/item/{{ item.id }}/eliminar"
+                                          class="d-inline" onsubmit="return confirm('Eliminar?')">
+                                        <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+
+                            {% if pedido.estado == 'sin_finalizar' %}
+                            <div class="modal fade" id="editModal{{ item.id }}" tabindex="-1">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <form method="POST" action="/pedido/{{ pedido.id }}/item/{{ item.id }}/editar">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Editar Item</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <p class="fw-bold">{{ item.prod_descripcion or item.descripcion_manual }}</p>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Destino</label>
+                                                    <select name="destino" class="form-select">
+                                                        <option value="tucuman" {% if item.destino == 'tucuman' %}selected{% endif %}>Tucumán</option>
+                                                        <option value="alsina" {% if item.destino == 'alsina' %}selected{% endif %}>Alsina</option>
+                                                    </select>
+                                                </div>
+                                                {% if item.es_manual %}
+                                                <div class="mb-3">
+                                                    <label class="form-label">Categoría <small class="text-muted">(dónde aparece en el resumen/Excel)</small></label>
+                                                    <select name="categoria_manual" class="form-select">
+                                                        <option value="">Detectar automáticamente</option>
+                                                        {% for c in categorias %}
+                                                            <option value="{{ c.categoria }}" {% if c.categoria == item.categoria_manual %}selected{% endif %}>{{ categorias_display.get(c.categoria, c.categoria) }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                                {% endif %}
+                                                <div class="mb-3">
+                                                    <label class="form-label">Cantidad</label>
+                                                    <input type="number" name="cantidad" class="form-control" value="{{ item.cantidad }}" min="0">
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Colores</label>
+                                                    <input type="text" name="color_detalle" class="form-control" value="{{ item.color_detalle or '' }}">
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Notas</label>
+                                                    <input type="text" name="notas" class="form-control" value="{{ item.notas or '' }}">
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-primary">Guardar</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="table-light">
+                            <td colspan="2" class="text-end fw-bold">TOTAL {{ dest_label }}:</td>
+                            <td class="fw-bold fs-5">{{ items_list | sum(attribute='cantidad') }}</td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-4 text-muted">
+                <i class="bi bi-inbox display-4"></i>
+                <p class="mt-2">No hay items para {{ dest_label }}. Agregá productos arriba.</p>
+            </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Zona de peligro -->
+{% if pedido.estado == 'sin_finalizar' %}
+<div class="mt-5 pt-3 border-top">
+    <form method="POST" action="/pedido/{{ pedido.id }}/eliminar"
+          onsubmit="return confirm('ELIMINAR este pedido y todos sus items? Esta acción no se puede deshacer.')">
+        <button type="submit" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-trash"></i> Eliminar pedido
+        </button>
+    </form>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const PEDIDO_ID = {{ pedido.id }};
+const searchInput = document.getElementById('productoSearch');
+const resultadosDiv = document.getElementById('resultadosBusqueda');
+const seleccionadosDiv = document.getElementById('seleccionados');
+const listaSelDiv = document.getElementById('listaSeleccionados');
+const filtroCat = document.getElementById('filtroCat');
+const filtroLinea = document.getElementById('filtroLinea');
+let searchTimeout;
+
+// Estado: productos y familias seleccionados
+// Cada item: { key, type:'producto'|'familia', id?, nombre, descripcion, ean?, categoria?, linea?, diseno?, colores_str? }
+let seleccionados = [];
+
+function getKey(type, id, nombre) {
+    return type + '_' + (id || nombre);
+}
+
+function isSelected(key) {
+    return seleccionados.some(s => s.key === key);
+}
+
+function toggleSeleccion(item) {
+    const idx = seleccionados.findIndex(s => s.key === item.key);
+    if (idx >= 0) {
+        seleccionados.splice(idx, 1);
+    } else {
+        seleccionados.push(item);
+    }
+    actualizarUI();
+}
+
+function quitarSeleccion(key) {
+    seleccionados = seleccionados.filter(s => s.key !== key);
+    actualizarUI();
+}
+
+function limpiarSeleccion() {
+    seleccionados = [];
+    actualizarUI();
+}
+
+function actualizarUI() {
+    // Contador
+    document.getElementById('contadorSel').textContent = seleccionados.length;
+    document.getElementById('btnCount').textContent = seleccionados.length;
+
+    // Checkboxes en resultados
+    document.querySelectorAll('#resultadosBusqueda input[type=checkbox]').forEach(cb => {
+        cb.checked = isSelected(cb.dataset.key);
+        cb.closest('.producto-resultado, .familia-resultado')
+          ?.classList.toggle('checked', cb.checked);
+    });
+
+    // Panel de seleccionados
+    if (seleccionados.length === 0) {
+        seleccionadosDiv.style.display = 'none';
+        return;
+    }
+    seleccionadosDiv.style.display = 'block';
+
+    listaSelDiv.innerHTML = seleccionados.map(s => `
+        <div class="sel-item" data-key="${s.key}">
+            <div>
+                <div class="nombre">${s.nombre}</div>
+                ${s.type === 'familia'
+                    ? `<div class="meta-small"><i class="bi bi-collection"></i> Familia — ${s.variantes || ''} variantes — ${s.colores_str || ''}</div>`
+                    : `<div class="meta-small">${s.ean ? 'EAN: ' + s.ean : ''} ${s.categoria || ''}</div>`
+                }
+            </div>
+            <input type="number" class="form-control form-control-sm sel-cant" min="0" value="0" placeholder="Cant.">
+            <input type="text" class="form-control form-control-sm sel-color" placeholder="Colores/detalle...">
+            <input type="text" class="form-control form-control-sm sel-notas" placeholder="Notas...">
+            <button class="btn-quitar" onclick="quitarSeleccion('${s.key}')" title="Quitar">
+                <i class="bi bi-x-circle"></i>
+            </button>
+        </div>
+    `).join('');
+}
+
+function aplicarDestinoATodos() {
+    // El destino se lee al guardar desde el select global
+}
+
+// ── Búsqueda ────────────────────────────────────────────
+
+function buscarProductos() {
+    const q = searchInput ? searchInput.value.trim() : '';
+    const cat = filtroCat ? filtroCat.value : '';
+    const linea = filtroLinea ? filtroLinea.value : '';
+
+    if (!q && !cat && !linea) {
+        resultadosDiv.style.display = 'none';
+        return;
+    }
+
+    // Buscar familias y productos en paralelo
+    const params = `q=${encodeURIComponent(q)}&categoria=${encodeURIComponent(cat)}&linea=${encodeURIComponent(linea)}`;
+
+    Promise.all([
+        fetch(`/api/familias?${params}`).then(r => r.json()),
+        fetch(`/api/productos?${params}&limit=40`).then(r => r.json())
+    ]).then(([familias, productos]) => {
+        let html = '';
+
+        // Familias primero
+        if (familias.length > 0) {
+            html += '<div class="px-3 py-1 bg-light border-bottom"><small class="text-muted fw-bold"><i class="bi bi-collection"></i> FAMILIAS (seleccionar sin especificar color)</small></div>';
+            html += familias.map(f => {
+                const key = getKey('familia', null, f.nombre);
+                const checked = isSelected(key) ? 'checked' : '';
+                const checkedClass = checked ? 'checked' : '';
+                return `
+                    <div class="familia-resultado ${checkedClass}" onclick="toggleFamilia(this, ${JSON.stringify(f).replace(/"/g, '&quot;')})">
+                        <input type="checkbox" ${checked} data-key="${key}" onclick="event.stopPropagation()">
+                        <div style="flex:1">
+                            <strong>${f.nombre}</strong>
+                            <span class="badge bg-success ms-1">${f.variantes} colores</span>
+                            ${f.sku_tu_textil ? `<span class="badge bg-dark">${f.sku_tu_textil}</span>` : ''}
+                            ${f.mla_ids ? `<span class="badge bg-warning text-dark">${f.mla_ids}</span>` : ''}
+                            <div class="meta"><i class="bi bi-palette"></i> ${f.colores_str || 'Surtido de colores'}</div>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        // Separador
+        if (familias.length > 0 && productos.length > 0) {
+            html += '<div class="px-3 py-1 bg-light border-bottom"><small class="text-muted fw-bold"><i class="bi bi-box"></i> PRODUCTOS INDIVIDUALES (color específico)</small></div>';
+        }
+
+        // Productos individuales
+        if (productos.length > 0) {
+            html += productos.map(p => {
+                const key = getKey('producto', p.id, p.descripcion);
+                const checked = isSelected(key) ? 'checked' : '';
+                const checkedClass = checked ? 'checked' : '';
+                return `
+                    <div class="producto-resultado ${checkedClass}" onclick="toggleProducto(this, ${JSON.stringify(p).replace(/"/g, '&quot;')})">
+                        <input type="checkbox" ${checked} data-key="${key}" onclick="event.stopPropagation()">
+                        <div style="flex:1">
+                            <span class="desc">${p.descripcion}</span>
+                            <div class="meta">
+                                <span class="badge bg-secondary">${p.categoria || ''}</span>
+                                ${p.linea ? `<span class="badge bg-info text-dark">${p.linea}</span>` : ''}
+                                ${p.sku_tu_textil ? `<span class="badge bg-dark">${p.sku_tu_textil}</span>` : ''}
+                                ${p.mla_ids ? `<span class="badge bg-warning text-dark">${p.mla_ids}</span>` : ''}
+                                ${p.ean ? `EAN: ${p.ean}` : ''}
+                                ${p.color_nombre ? `| Color: ${p.color_nombre}` : ''}
+                            </div>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        if (!html) {
+            html = '<div class="p-3 text-muted">No se encontraron productos</div>';
+        }
+
+        resultadosDiv.innerHTML = html;
+        resultadosDiv.style.display = 'block';
+    });
+}
+
+function toggleProducto(el, p) {
+    const key = getKey('producto', p.id, p.descripcion);
+    toggleSeleccion({
+        key, type: 'producto', id: p.id,
+        nombre: p.descripcion, ean: p.ean,
+        categoria: p.categoria, linea: p.linea
+    });
+    // Actualizar checkbox visual
+    const cb = el.querySelector('input[type=checkbox]');
+    if (cb) cb.checked = isSelected(key);
+    el.classList.toggle('checked', isSelected(key));
+}
+
+function toggleFamilia(el, f) {
+    const key = getKey('familia', null, f.nombre);
+    toggleSeleccion({
+        key, type: 'familia', id: null,
+        nombre: f.nombre,
+        categoria: f.categoria, linea: f.linea, diseno: f.diseno,
+        sku_tu_textil: f.sku_tu_textil, mla_ids: f.mla_ids,
+        variantes: f.variantes, colores_str: f.colores_str
+    });
+    const cb = el.querySelector('input[type=checkbox]');
+    if (cb) cb.checked = isSelected(key);
+    el.classList.toggle('checked', isSelected(key));
+}
+
+// ── Guardar todos ───────────────────────────────────────
+
+function guardarTodos() {
+    if (seleccionados.length === 0) return;
+
+    const destinoGlobal = document.getElementById('destinoGlobal').value;
+    const items = [];
+
+    document.querySelectorAll('.sel-item').forEach((el, i) => {
+        const s = seleccionados[i];
+        const cantidad = parseInt(el.querySelector('.sel-cant').value) || 0;
+        const color_detalle = el.querySelector('.sel-color').value.trim();
+        const notas = el.querySelector('.sel-notas').value.trim();
+
+        // Leer destino individual si existe, sino global
+        const destSelect = el.querySelector('.sel-dest');
+        const destino = destSelect ? destSelect.value : destinoGlobal;
+
+        if (s.type === 'producto') {
+            items.push({
+                producto_id: s.id,
+                destino, cantidad, color_detalle, notas
+            });
+        } else {
+            // Familia: item manual con SKU como código (el Excel busca el MLA por SKU)
+            items.push({
+                es_manual: true,
+                es_familia: true,
+                descripcion_manual: s.nombre,
+                codigo_manual: s.sku_tu_textil || '',
+                categoria_manual: s.categoria || '',
+                destino, cantidad, color_detalle, notas
+            });
+        }
+    });
+
+    fetch(`/pedido/${PEDIDO_ID}/agregar`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(items)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            window.location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'desconocido'));
+        }
+    })
+    .catch(err => alert('Error de red: ' + err));
+}
+
+// ── Event listeners ─────────────────────────────────────
+
+if (searchInput) {
+    searchInput.addEventListener('input', () => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(buscarProductos, 300);
+    });
+    // Mostrar resultados al hacer foco si hay texto
+    searchInput.addEventListener('focus', () => {
+        if (searchInput.value.trim() || filtroCat.value || filtroLinea.value) {
+            buscarProductos();
+        }
+    });
+}
+
+if (filtroCat) {
+    filtroCat.addEventListener('change', () => {
+        fetch(`/api/lineas?categoria=${encodeURIComponent(filtroCat.value)}`)
+            .then(r => r.json())
+            .then(lineas => {
+                filtroLinea.innerHTML = '<option value="">Todas las líneas</option>';
+                lineas.forEach(l => {
+                    filtroLinea.innerHTML += `<option value="${l}">${l}</option>`;
+                });
+            });
+        buscarProductos();
+    });
+}
+
+if (filtroLinea) {
+    filtroLinea.addEventListener('change', buscarProductos);
+}
+
+// NO cerrar al hacer click en los resultados
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('#resultadosBusqueda') &&
+        !e.target.closest('#productoSearch') &&
+        !e.target.closest('#seleccionados') &&
+        !e.target.closest('.form-select')) {
+        // Solo ocultar si no estamos interactuando con seleccionados
+        if (resultadosDiv && !seleccionados.length) {
+            resultadosDiv.style.display = 'none';
+        }
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-box-seam"></i> Pedidos Coteminas</h2>
+    <a href="/pedido/nuevo" class="btn btn-primary btn-lg">
+        <i class="bi bi-plus-circle"></i> Nuevo Pedido
+    </a>
+</div>
+
+{% if pedidos %}
+    <!-- Pedidos sin finalizar -->
+    {% set borradores = pedidos | selectattr('estado', 'equalto', 'sin_finalizar') | list %}
+    {% if borradores %}
+    <h4 class="mb-3 estado-borrador"><i class="bi bi-pencil-square"></i> Sin finalizar</h4>
+    <div class="row g-3 mb-5">
+        {% for p in borradores %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <h5 class="card-title mb-1">
+                            {{ p.mes | mes_nombre }} {{ p.anio }}
+                            {% if p.tipo == 'parcial' %}
+                                <span class="badge bg-info text-dark">{{ p | etiqueta_tipo }}</span>
+                            {% else %}
+                                <span class="badge bg-primary">Total</span>
+                            {% endif %}
+                        </h5>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-warning text-dark">Sin finalizar</span>
+                            <form method="POST" action="/pedido/{{ p.id }}/eliminar" class="d-inline"
+                                  onsubmit="return confirm('¿Eliminar el pedido {{ p.mes | mes_nombre }} {{ p.anio }}? Esta acción no se puede deshacer.')">
+                                <button type="submit" class="btn btn-sm btn-link text-danger p-0" title="Eliminar pedido">
+                                    <i class="bi bi-x-circle-fill fs-5"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    <small class="text-muted"><i class="bi bi-calendar-event"></i> {{ p.fecha_pedido | fecha_legible }}</small>
+                    <div class="mt-2">
+                        <div class="row text-center">
+                            <div class="col-6">
+                                <div class="p-2 rounded" style="background: rgba(84,130,53,0.1);">
+                                    <small class="text-muted d-block">Tucumán</small>
+                                    <strong class="fs-4">{{ p.total_tucuman or 0 }}</strong>
+                                    <small class="text-muted d-block">{{ p.items_tucuman or 0 }} items</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="p-2 rounded" style="background: rgba(47,84,150,0.1);">
+                                    <small class="text-muted d-block">Alsina</small>
+                                    <strong class="fs-4">{{ p.total_alsina or 0 }}</strong>
+                                    <small class="text-muted d-block">{{ p.items_alsina or 0 }} items</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% if p.notas %}
+                        <p class="text-muted small mt-2 mb-0"><i class="bi bi-chat-text"></i> {{ p.notas[:80] }}</p>
+                    {% endif %}
+                </div>
+                <div class="card-footer bg-white border-0 d-flex gap-2">
+                    <a href="/pedido/{{ p.id }}" class="btn btn-primary btn-sm flex-fill">
+                        <i class="bi bi-pencil"></i> Editar
+                    </a>
+                    <a href="/pedido/{{ p.id }}/resumen" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-list-check"></i> Resumen
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Pedidos finalizados -->
+    {% set terminados = pedidos | selectattr('estado', 'equalto', 'finalizado') | list %}
+    {% if terminados %}
+    <h4 class="mb-3 estado-terminado"><i class="bi bi-check-circle"></i> Finalizados</h4>
+    <div class="row g-3">
+        {% for p in terminados %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100" style="opacity: 0.85;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <h5 class="card-title mb-1">
+                            {{ p.mes | mes_nombre }} {{ p.anio }}
+                            {% if p.tipo == 'parcial' %}
+                                <span class="badge bg-info text-dark">{{ p | etiqueta_tipo }}</span>
+                            {% else %}
+                                <span class="badge bg-primary">Total</span>
+                            {% endif %}
+                        </h5>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-success">Finalizado</span>
+                            <form method="POST" action="/pedido/{{ p.id }}/eliminar" class="d-inline"
+                                  onsubmit="return confirm('¿Eliminar el pedido {{ p.mes | mes_nombre }} {{ p.anio }}? Esta acción no se puede deshacer.')">
+                                <button type="submit" class="btn btn-sm btn-link text-danger p-0" title="Eliminar pedido">
+                                    <i class="bi bi-x-circle-fill fs-5"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    <small class="text-muted"><i class="bi bi-calendar-event"></i> {{ p.fecha_pedido | fecha_legible }}</small>
+                    <div class="mt-2 row text-center">
+                        <div class="col-6">
+                            <small class="text-muted">Tucumán:</small>
+                            <strong>{{ p.total_tucuman or 0 }}</strong>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">Alsina:</small>
+                            <strong>{{ p.total_alsina or 0 }}</strong>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-white border-0 d-flex gap-2">
+                    <a href="/pedido/{{ p.id }}/resumen" class="btn btn-outline-primary btn-sm flex-fill">
+                        <i class="bi bi-list-check"></i> Ver Resumen
+                    </a>
+                    <a href="/pedido/{{ p.id }}/exportar" class="btn btn-outline-success btn-sm">
+                        <i class="bi bi-file-earmark-excel"></i> Excel
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+{% else %}
+    <div class="text-center py-5">
+        <i class="bi bi-inbox display-1 text-muted"></i>
+        <h4 class="text-muted mt-3">No hay pedidos todavía</h4>
+        <p class="text-muted">Creá tu primer pedido para empezar</p>
+        <a href="/pedido/nuevo" class="btn btn-primary btn-lg mt-2">
+            <i class="bi bi-plus-circle"></i> Crear Pedido
+        </a>
+    </div>
+{% endif %}
+{% endblock %}
