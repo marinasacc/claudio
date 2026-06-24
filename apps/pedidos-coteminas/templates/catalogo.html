@@ -3,7 +3,12 @@
 {% block title %}Catálogo de Productos{% endblock %}
 
 {% block content %}
-<h2 class="mb-4"><i class="bi bi-grid"></i> Catálogo de Productos</h2>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0"><i class="bi bi-grid"></i> Catálogo de Productos</h2>
+    <a href="/catalogo/nuevo" class="btn btn-success">
+        <i class="bi bi-plus-circle"></i> Nuevo producto
+    </a>
+</div>
 
 <!-- Filtros -->
 <div class="card mb-4">
@@ -41,6 +46,16 @@
                     <i class="bi bi-search"></i> Buscar
                 </button>
             </div>
+            <div class="col-12">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="inactivos" value="1"
+                           id="inactivos" {% if incluir_inactivos %}checked{% endif %}
+                           onchange="this.form.submit()">
+                    <label class="form-check-label" for="inactivos">
+                        Mostrar también productos discontinuados
+                    </label>
+                </div>
+            </div>
         </form>
     </div>
 </div>
@@ -48,11 +63,17 @@
 <!-- Resultados -->
 <div class="d-flex justify-content-between align-items-center mb-2">
     <small class="text-muted">{{ productos | length }} productos encontrados</small>
-    {% if filtro_q or filtro_categoria or filtro_linea %}
-        <a href="/catalogo" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-x"></i> Limpiar filtros
-        </a>
-    {% endif %}
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-sm btn-primary" id="btnEditarSeleccion"
+                data-bs-toggle="modal" data-bs-target="#modalMasivo" disabled>
+            <i class="bi bi-pencil-square"></i> Editar seleccionados (<span id="contadorSel">0</span>)
+        </button>
+        {% if filtro_q or filtro_categoria or filtro_linea or incluir_inactivos %}
+            <a href="/catalogo" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-x"></i> Limpiar filtros
+            </a>
+        {% endif %}
+    </div>
 </div>
 
 {% if productos %}
@@ -60,6 +81,7 @@
     <table class="table table-sm table-hover">
         <thead class="table-light">
             <tr>
+                <th style="width:1%"><input type="checkbox" class="form-check-input" id="checkAll" title="Seleccionar todos"></th>
                 <th>SKU</th>
                 <th>MLA</th>
                 <th>Código</th>
@@ -68,15 +90,22 @@
                 <th>Línea</th>
                 <th>Color</th>
                 <th>EAN</th>
+                <th class="text-end">Acciones</th>
             </tr>
         </thead>
         <tbody>
             {% for p in productos %}
-            <tr>
+            <tr {% if p.estado != 'activo' %}class="table-secondary text-muted"{% endif %}>
+                <td><input type="checkbox" class="form-check-input row-check" value="{{ p.id }}"></td>
                 <td>{% if p.sku_tu_textil %}<span class="badge bg-dark">{{ p.sku_tu_textil }}</span>{% else %}-{% endif %}</td>
                 <td>{% if p.mla_ids %}{% for mla in p.mla_ids.split(',') %}<a href="https://articulo.mercadolibre.com.ar/{{ mla }}" target="_blank" class="badge bg-warning text-dark text-decoration-none">{{ mla }}</a> {% endfor %}{% else %}-{% endif %}</td>
                 <td><code class="small">{{ p.codigo }}</code></td>
-                <td class="fw-bold">{{ p.descripcion }}</td>
+                <td class="fw-bold">
+                    {{ p.descripcion }}
+                    {% if p.estado != 'activo' %}
+                        <span class="badge bg-secondary">discontinuado</span>
+                    {% endif %}
+                </td>
                 <td><span class="badge bg-secondary">{{ categorias_display.get(p.categoria, p.categoria) }}</span></td>
                 <td>{{ p.linea or '-' }}</td>
                 <td>
@@ -88,6 +117,30 @@
                     {% endif %}
                 </td>
                 <td><small>{{ p.ean or '-' }}</small></td>
+                <td class="text-end text-nowrap">
+                    <a href="/catalogo/{{ p.id }}/editar" class="btn btn-sm btn-outline-primary" title="Editar">
+                        <i class="bi bi-pencil"></i>
+                    </a>
+                    <a href="/catalogo/{{ p.id }}/duplicar" class="btn btn-sm btn-outline-info" title="Duplicar">
+                        <i class="bi bi-files"></i>
+                    </a>
+                    {% if p.estado == 'activo' %}
+                        <form method="POST" action="/catalogo/{{ p.id }}/estado" class="d-inline"
+                              onsubmit="return confirm('¿Discontinuar este producto? Se oculta del catálogo pero los pedidos guardados no se tocan.');">
+                            <input type="hidden" name="accion" value="discontinuar">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary" title="Discontinuar">
+                                <i class="bi bi-eye-slash"></i>
+                            </button>
+                        </form>
+                    {% else %}
+                        <form method="POST" action="/catalogo/{{ p.id }}/estado" class="d-inline">
+                            <input type="hidden" name="accion" value="reactivar">
+                            <button type="submit" class="btn btn-sm btn-outline-success" title="Reactivar">
+                                <i class="bi bi-arrow-counterclockwise"></i>
+                            </button>
+                        </form>
+                    {% endif %}
+                </td>
             </tr>
             {% endfor %}
         </tbody>
@@ -100,4 +153,154 @@
     <p>Probá con otros filtros</p>
 </div>
 {% endif %}
+
+<!-- Modal de edición masiva -->
+<div class="modal fade" id="modalMasivo" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <form method="POST" action="/catalogo/editar-masivo" id="formMasivo">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-pencil-square"></i>
+            Editar <span id="modalContador">0</span> productos a la vez
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small">
+            Tildá solo los campos que querés cambiar. Lo que dejes sin tildar
+            <strong>queda como está</strong> en cada producto. Esto no borra ningún pedido.
+          </p>
+
+          {% set campos = [
+            ('sku_tu_textil', 'SKU Tu Textil', 'Ej: GR192J'),
+            ('mla_ids', 'MLA (MercadoLibre)', 'Ej: MLA658088962 (varios con coma)'),
+            ('linea', 'Línea', 'Ej: Arco Iris'),
+            ('diseno', 'Diseño / Modelo', 'Ej: Detroit'),
+            ('origen', 'Origen', 'Nacional / Importado'),
+            ('coleccion', 'Colección', 'OI26')
+          ] %}
+
+          {% for campo, etiqueta, ph in campos %}
+          <div class="row g-2 align-items-center mb-2">
+            <div class="col-auto">
+              <input class="form-check-input aplicar-check" type="checkbox"
+                     name="aplicar_{{ campo }}" id="ap_{{ campo }}" data-target="campo_{{ campo }}">
+            </div>
+            <div class="col-3">
+              <label class="form-label mb-0 fw-bold" for="ap_{{ campo }}">{{ etiqueta }}</label>
+            </div>
+            <div class="col">
+              <input type="text" name="{{ campo }}" id="campo_{{ campo }}"
+                     class="form-control" placeholder="{{ ph }}" disabled>
+            </div>
+          </div>
+          {% endfor %}
+
+          <!-- Categoría -->
+          <div class="row g-2 align-items-center mb-2">
+            <div class="col-auto">
+              <input class="form-check-input aplicar-check" type="checkbox"
+                     name="aplicar_categoria" id="ap_categoria" data-target="campo_categoria">
+            </div>
+            <div class="col-3">
+              <label class="form-label mb-0 fw-bold" for="ap_categoria">Categoría</label>
+            </div>
+            <div class="col">
+              <select name="categoria" id="campo_categoria" class="form-select" disabled>
+                <option value="">(vaciar categoría)</option>
+                {% for clave, nombre in categorias_display.items() %}
+                  <option value="{{ clave }}">{{ nombre }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <hr>
+          <!-- Estado -->
+          <div class="row g-2 align-items-center">
+            <div class="col-3"><label class="form-label mb-0 fw-bold">Estado</label></div>
+            <div class="col">
+              <select name="estado_accion" class="form-select">
+                <option value="">No cambiar</option>
+                <option value="discontinuar">Discontinuar (ocultar del catálogo)</option>
+                <option value="reactivar">Reactivar</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg"></i> Aplicar a los seleccionados
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  const checkAll = document.getElementById('checkAll');
+  const rowChecks = () => Array.from(document.querySelectorAll('.row-check'));
+  const btnEditar = document.getElementById('btnEditarSeleccion');
+  const contadorSel = document.getElementById('contadorSel');
+  const modalContador = document.getElementById('modalContador');
+
+  function seleccionados() {
+    return rowChecks().filter(c => c.checked).map(c => c.value);
+  }
+
+  function actualizar() {
+    const n = seleccionados().length;
+    contadorSel.textContent = n;
+    if (modalContador) modalContador.textContent = n;
+    btnEditar.disabled = n === 0;
+    if (checkAll) {
+      const total = rowChecks().length;
+      checkAll.checked = n > 0 && n === total;
+      checkAll.indeterminate = n > 0 && n < total;
+    }
+  }
+
+  if (checkAll) {
+    checkAll.addEventListener('change', () => {
+      rowChecks().forEach(c => { c.checked = checkAll.checked; });
+      actualizar();
+    });
+  }
+  rowChecks().forEach(c => c.addEventListener('change', actualizar));
+
+  // Habilitar cada input solo si su "aplicar" está tildado
+  document.querySelectorAll('.aplicar-check').forEach(chk => {
+    const campo = document.getElementById(chk.dataset.target);
+    chk.addEventListener('change', () => {
+      if (campo) {
+        campo.disabled = !chk.checked;
+        if (chk.checked) campo.focus();
+      }
+    });
+  });
+
+  // Al enviar, inyectar los ids seleccionados como inputs ocultos
+  const form = document.getElementById('formMasivo');
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      form.querySelectorAll('input[name="ids"]').forEach(el => el.remove());
+      const ids = seleccionados();
+      if (ids.length === 0) { e.preventDefault(); return; }
+      ids.forEach(id => {
+        const h = document.createElement('input');
+        h.type = 'hidden'; h.name = 'ids'; h.value = id;
+        form.appendChild(h);
+      });
+    });
+  }
+
+  actualizar();
+})();
+</script>
 {% endblock %}

@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}Cargar entrega{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="bi bi-envelope-plus"></i> Cargar email de confirmación</h2>
+    <a href="/entregas" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Volver</a>
+</div>
+
+{% if not preview %}
+<!-- Paso 1: pegar el email -->
+<div class="card">
+    <div class="card-body">
+        <form method="POST" action="/entregas/nueva">
+            <label class="form-label fw-bold">Pegá acá el email que te mandó Coteminas</label>
+            <textarea name="texto_email" class="form-control" rows="14"
+                      placeholder="Pegá todo el email de confirmación de facturación..." required></textarea>
+            <div class="mt-3">
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="bi bi-magic"></i> Leer email
+                </button>
+                <small class="text-muted ms-2">Voy a extraer el depósito, factura, remito y los productos automáticamente.</small>
+            </div>
+        </form>
+    </div>
+</div>
+{% else %}
+<!-- Paso 2: preview de lo parseado -->
+<form method="POST" action="/entregas/guardar">
+    <input type="hidden" name="items_json" value='{{ items_json }}'>
+    <input type="hidden" name="texto_email" value="{{ preview.texto_email }}">
+    <input type="hidden" name="cliente" value="{{ preview.cliente or '' }}">
+    <input type="hidden" name="factura" value="{{ preview.factura or '' }}">
+    <input type="hidden" name="remito" value="{{ preview.remito or '' }}">
+    <input type="hidden" name="pedido_proveedor" value="{{ preview.pedido_proveedor or '' }}">
+    <input type="hidden" name="fecha_emision" value="{{ preview.fecha_emision or '' }}">
+    <input type="hidden" name="fecha_vencimiento" value="{{ preview.fecha_vencimiento or '' }}">
+    <input type="hidden" name="valor_total" value="{{ preview.valor_total or '' }}">
+
+    {% if preview.destino %}
+    <div class="alert alert-success">
+        <i class="bi bi-check-circle"></i> Leí el email. Revisá que esté todo bien y completá la <strong>fecha de entrega</strong>.
+    </div>
+    {% else %}
+    <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle"></i> <strong>No pude detectar el depósito</strong> (el cliente del email no dice claramente Alberto ni Sergio, o hay dos emails mezclados). <strong>Elegí el depósito a mano</strong> abajo antes de guardar.
+    </div>
+    {% endif %}
+
+    <!-- Cabecera -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Depósito</label>
+                    <select name="destino" class="form-select">
+                        <option value="tucuman" {% if preview.destino == 'tucuman' %}selected{% endif %}>Tucumán (Sergio)</option>
+                        <option value="alsina" {% if preview.destino == 'alsina' %}selected{% endif %}>Alsina (Alberto)</option>
+                    </select>
+                    {% if preview.cliente %}
+                        <small class="text-muted">Cliente: {{ preview.cliente }}</small>
+                    {% endif %}
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold">Factura</label>
+                    <input type="text" class="form-control" value="{{ preview.factura or '-' }}" readonly>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold">Remito</label>
+                    <input type="text" class="form-control" value="{{ preview.remito or '-' }}" readonly>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Pedido prov.</label>
+                    <input type="text" class="form-control" value="{{ preview.pedido_proveedor or '-' }}" readonly>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Emisión / Vencimiento</label>
+                    <input type="text" class="form-control" value="{{ preview.fecha_emision or '-' }} → {{ preview.fecha_vencimiento or '-' }}" readonly>
+                </div>
+            </div>
+            <div class="row g-3 mt-1">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-primary">📅 Fecha de entrega (para el proveedor)</label>
+                    <input type="date" name="fecha_entrega" class="form-control form-control-lg">
+                    <small class="text-muted">La fecha que vas a coordinar con Coteminas</small>
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label">Notas</label>
+                    <input type="text" name="notas" class="form-control" placeholder="Aclaraciones sobre esta entrega...">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Items -->
+    <div class="card mb-3">
+        <div class="card-header bg-white d-flex justify-content-between">
+            <strong><i class="bi bi-box-seam"></i> {{ preview['items'] | length }} artículos · {{ preview.total_unidades }} unidades</strong>
+            <small class="text-muted">{{ preview.n_en_catalogo }}/{{ preview['items'] | length }} reconocidos del catálogo</small>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Código</th>
+                        <th style="min-width:230px">SKU</th>
+                        <th>Descripción</th>
+                        <th class="text-center">Cantidad</th>
+                        <th class="text-end">Valor unit.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for it in preview['items'] %}
+                    <tr {% if not it.en_catalogo %}class="table-warning"{% endif %}>
+                        <td><code class="small">{{ it.codigo }}</code></td>
+                        <td>
+                            {% if it.en_catalogo %}
+                                <span class="badge bg-dark">{{ it.sku }}</span>
+                            {% else %}
+                                <!-- Variante nueva: asignar SKU a mano -->
+                                <select name="sku_item_{{ loop.index0 }}" class="form-select form-select-sm">
+                                    <option value="">— Elegí el modelo (SKU) —</option>
+                                    {% for s in skus_disponibles %}
+                                        <option value="{{ s.sku }}">{{ s.label }}</option>
+                                    {% endfor %}
+                                </select>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {{ it.descripcion }}
+                            {% if not it.en_catalogo %}
+                                <span class="badge bg-warning text-dark" title="Color/código que no está en el catálogo">variante nueva</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center fw-bold">{{ it.cantidad }}</td>
+                        <td class="text-end">{% if it.valor_unit %}${{ '{:,.2f}'.format(it.valor_unit) }}{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="table-light">
+                        <td colspan="3" class="text-end fw-bold">TOTAL UNIDADES:</td>
+                        <td class="text-center fw-bold fs-5">{{ preview.total_unidades }}</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-success btn-lg flex-fill">
+            <i class="bi bi-save"></i> Guardar entrega
+        </button>
+        <a href="/entregas/nueva" class="btn btn-outline-secondary btn-lg">Cancelar / Pegar otro</a>
+    </div>
+</form>
+{% endif %}
+{% endblock %}

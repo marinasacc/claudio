@@ -113,6 +113,43 @@ def init_db():
             FOREIGN KEY (confirmacion_id) REFERENCES confirmaciones(id) ON DELETE CASCADE,
             FOREIGN KEY (producto_id) REFERENCES productos(id)
         );
+
+        -- ENTREGAS: confirmaciones de facturación del proveedor (lo que realmente envía)
+        -- Independientes de los pedidos. Una entrega = una factura/remito de Coteminas.
+        CREATE TABLE IF NOT EXISTS entregas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            destino TEXT,                   -- tucuman (Sergio) / alsina (Alberto)
+            cliente TEXT,                   -- nombre del cliente facturado (ej SACCAL ALBERTO JULIO)
+            factura TEXT,                   -- nro de factura
+            remito TEXT,                    -- nro de remito
+            pedido_proveedor TEXT,          -- nro de pedido del proveedor (ej 319176)
+            fecha_emision TEXT,             -- dd/mm/aaaa (del email)
+            fecha_vencimiento TEXT,         -- dd/mm/aaaa (del email)
+            fecha_entrega TEXT,             -- YYYY-MM-DD, la que Maru coordina con el proveedor (editable)
+            valor_total REAL,               -- valor total de la factura
+            texto_email TEXT,               -- email original pegado
+            notas TEXT,
+            pedido_id INTEGER,              -- opcional: vínculo a un pedido interno (NULL si no se asocia)
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (pedido_id) REFERENCES pedidos(id) ON DELETE SET NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS entrega_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            entrega_id INTEGER NOT NULL,
+            producto_id INTEGER,            -- NULL si el código no matchea el catálogo
+            codigo_item TEXT,               -- código del proveedor tal cual vino en el email
+            sku_manual TEXT,                -- SKU asignado a mano (variante nueva de un modelo existente)
+            descripcion TEXT,               -- descripción del email
+            cantidad INTEGER,
+            valor_unit REAL,
+            valor_total REAL,
+            FOREIGN KEY (entrega_id) REFERENCES entregas(id) ON DELETE CASCADE,
+            FOREIGN KEY (producto_id) REFERENCES productos(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_entregas_destino ON entregas(destino);
+        CREATE INDEX IF NOT EXISTS idx_entrega_items_entrega ON entrega_items(entrega_id);
     """)
 
     # Migraciones defensivas para bases de datos existentes
@@ -122,6 +159,7 @@ def init_db():
         ("pedido_items", "categoria_manual", "TEXT"),
         ("pedido_items", "es_familia", "INTEGER DEFAULT 0"),
         ("pedidos", "fecha_pedido", "TEXT"),
+        ("entrega_items", "sku_manual", "TEXT"),
     ]
     for tabla, columna, tipo in migraciones:
         cols = [r[1] for r in conn.execute(f"PRAGMA table_info({tabla})").fetchall()]

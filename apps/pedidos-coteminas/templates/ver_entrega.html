@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Entrega Factura {{ entrega.factura }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">
+            <i class="bi bi-truck"></i> Entrega
+            {% if entrega.destino == 'tucuman' %}
+                <span class="badge badge-tucuman">Tucumán - Sergio</span>
+            {% elif entrega.destino == 'alsina' %}
+                <span class="badge badge-alsina">Alsina - Alberto</span>
+            {% endif %}
+        </h2>
+        <small class="text-muted">{{ entrega.cliente or '' }}</small>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/entregas/{{ entrega.id }}/exportar" class="btn btn-outline-success">
+            <i class="bi bi-file-earmark-excel"></i> Excel
+        </a>
+        <a href="/entregas" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Volver</a>
+    </div>
+</div>
+
+<!-- Datos de la factura -->
+<div class="row g-3 mb-3">
+    <div class="col-md-3">
+        <div class="card"><div class="card-body py-2">
+            <small class="text-muted d-block">Factura</small>
+            <strong class="fs-5">{{ entrega.factura or '-' }}</strong>
+        </div></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card"><div class="card-body py-2">
+            <small class="text-muted d-block">Remito</small>
+            <strong class="fs-5">{{ entrega.remito or '-' }}</strong>
+        </div></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card"><div class="card-body py-2">
+            <small class="text-muted d-block">Pedido proveedor</small>
+            <strong class="fs-5">{{ entrega.pedido_proveedor or '-' }}</strong>
+        </div></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card"><div class="card-body py-2">
+            <small class="text-muted d-block">Emisión</small>
+            <strong>{{ entrega.fecha_emision or '-' }}</strong>
+            <small class="text-muted">(vence {{ entrega.fecha_vencimiento or '-' }})</small>
+        </div></div>
+    </div>
+</div>
+
+<!-- Fecha de entrega (editable) -->
+<div class="card mb-3 {% if entrega.fecha_entrega %}border-success{% else %}border-warning{% endif %}" style="border-width:2px;">
+    <div class="card-body">
+        <form method="POST" action="/entregas/{{ entrega.id }}/editar" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label fw-bold text-primary">📅 Fecha de entrega</label>
+                <input type="date" name="fecha_entrega" class="form-control form-control-lg"
+                       value="{{ entrega.fecha_entrega or '' }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Depósito</label>
+                <select name="destino" class="form-select">
+                    <option value="tucuman" {% if entrega.destino == 'tucuman' %}selected{% endif %}>Tucumán (Sergio)</option>
+                    <option value="alsina" {% if entrega.destino == 'alsina' %}selected{% endif %}>Alsina (Alberto)</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Notas</label>
+                <input type="text" name="notas" class="form-control" value="{{ entrega.notas or '' }}">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100"><i class="bi bi-save"></i> Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Items -->
+<div class="card">
+    <div class="card-header bg-white">
+        <strong><i class="bi bi-box-seam"></i> {{ items | length }} artículos · {{ total_unidades }} unidades</strong>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Código</th>
+                    <th>SKU</th>
+                    <th>Descripción</th>
+                    <th class="text-center">Cantidad</th>
+                    <th class="text-end">Valor unit.</th>
+                    <th class="text-end">Valor total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for it in items %}
+                <tr>
+                    <td><code class="small">{{ it.codigo_item }}</code></td>
+                    <td>
+                        {% if it.prod_sku %}<span class="badge bg-dark">{{ it.prod_sku }}</span>{% endif %}
+                        {% if not it.producto_id and it.sku_manual %}
+                            <i class="bi bi-hand-index-thumb text-muted" title="SKU asignado a mano"></i>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {{ it.descripcion }}
+                        {% if not it.producto_id and not it.sku_manual %}
+                            <span class="badge bg-warning text-dark">sin asignar</span>
+                        {% elif not it.producto_id and it.sku_manual %}
+                            <span class="badge bg-info text-dark">variante nueva</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center fw-bold">{{ it.cantidad }}</td>
+                    <td class="text-end">{% if it.valor_unit %}${{ '{:,.2f}'.format(it.valor_unit) }}{% endif %}</td>
+                    <td class="text-end">{% if it.valor_total %}${{ '{:,.2f}'.format(it.valor_total) }}{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="table-light">
+                    <td colspan="3" class="text-end fw-bold">TOTAL:</td>
+                    <td class="text-center fw-bold fs-5">{{ total_unidades }}</td>
+                    <td></td>
+                    <td class="text-end fw-bold">{% if entrega.valor_total %}${{ '{:,.2f}'.format(entrega.valor_total) }}{% endif %}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+
+<div class="mt-4">
+    <form method="POST" action="/entregas/{{ entrega.id }}/eliminar"
+          onsubmit="return confirm('¿Eliminar esta entrega? No se puede deshacer.')">
+        <button type="submit" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-trash"></i> Eliminar entrega
+        </button>
+    </form>
+</div>
+{% endblock %}

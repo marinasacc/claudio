@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}{% if es_nuevo %}Nuevo producto{% else %}Editar producto{% endif %}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">
+        {% if duplicando %}
+            <i class="bi bi-files"></i> Duplicar producto
+        {% elif es_nuevo %}
+            <i class="bi bi-plus-circle"></i> Nuevo producto
+        {% else %}
+            <i class="bi bi-pencil-square"></i> Editar producto
+        {% endif %}
+    </h2>
+    <a href="/catalogo" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Volver al catálogo
+    </a>
+</div>
+
+{% if duplicando %}
+<div class="alert alert-info border small">
+    <i class="bi bi-files"></i>
+    Estás <strong>duplicando</strong> un producto: los campos vienen precargados con una copia.
+    Cambiá lo que necesites (normalmente el <strong>código</strong> y el <strong>color</strong>)
+    y al guardar se crea un producto <strong>nuevo</strong>. El original no se toca.
+</div>
+{% elif not es_nuevo %}
+<div class="alert alert-light border small">
+    <i class="bi bi-info-circle"></i>
+    Los cambios que guardes acá <strong>no borran ningún pedido</strong>: los pedidos
+    quedan vinculados a este producto y se actualizan con la info corregida.
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-body">
+        <form method="POST" action="{{ form_action or '' }}">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">SKU Tu Textil</label>
+                    <input type="text" name="sku_tu_textil" class="form-control"
+                           value="{{ producto.sku_tu_textil or '' }}" placeholder="Ej: GR192J">
+                    <small class="text-muted">Código interno de Tu Textil.</small>
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label fw-bold">MLA (MercadoLibre)</label>
+                    <input type="text" name="mla_ids" class="form-control"
+                           value="{{ producto.mla_ids or '' }}"
+                           placeholder="Ej: MLA658088962 (varios separados por coma)">
+                    <small class="text-muted">Una o varias publicaciones, separadas por coma o espacio.</small>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">Código del proveedor *</label>
+                    <input type="text" name="codigo" class="form-control" required
+                           value="{{ producto.codigo or '' }}">
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label fw-bold">Descripción *</label>
+                    <input type="text" name="descripcion" class="form-control" required
+                           value="{{ producto.descripcion or '' }}">
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">Categoría</label>
+                    <select name="categoria" class="form-select">
+                        <option value="">(sin categoría)</option>
+                        {% for c in categorias_orden %}
+                            <option value="{{ c }}" {% if producto.categoria == c %}selected{% endif %}>
+                                {{ categorias_display.get(c, c) }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Línea</label>
+                    <input type="text" name="linea" class="form-control"
+                           value="{{ producto.linea or '' }}" placeholder="Ej: Arco Iris">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Diseño / Modelo</label>
+                    <input type="text" name="diseno" class="form-control"
+                           value="{{ producto.diseno or '' }}" placeholder="Ej: Detroit">
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">Color (nombre)</label>
+                    <input type="text" name="color_nombre" class="form-control"
+                           value="{{ producto.color_nombre or '' }}" placeholder="Ej: Beige">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Color (código)</label>
+                    <input type="text" name="color_codigo" class="form-control"
+                           value="{{ producto.color_codigo or '' }}" placeholder="8318">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Tamaño</label>
+                    <input type="text" name="tamanio" class="form-control"
+                           value="{{ producto.tamanio or '' }}" placeholder="Ej: 2 1/2">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Tipo</label>
+                    <input type="text" name="tipo" class="form-control"
+                           value="{{ producto.tipo or '' }}" placeholder="Ej: Jacquard">
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">EAN (código de barras)</label>
+                    <input type="text" name="ean" class="form-control"
+                           value="{{ producto.ean or '' }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Origen</label>
+                    <input type="text" name="origen" class="form-control"
+                           value="{{ producto.origen or '' }}" placeholder="Nacional / Importado">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Colección</label>
+                    <input type="text" name="coleccion" class="form-control"
+                           value="{{ producto.coleccion or '' }}" placeholder="OI26">
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between mt-4">
+                <a href="/catalogo" class="btn btn-outline-secondary">Cancelar</a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg"></i>
+                    {% if es_nuevo %}Crear producto{% else %}Guardar cambios{% endif %}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

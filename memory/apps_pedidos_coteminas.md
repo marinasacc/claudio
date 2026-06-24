@@ -30,9 +30,27 @@
 - **Edición incremental**: el pedido queda en borrador, se va completando de a poco
 - **Resumen** por depósito con totales por categoría (las familias caen en su categoría real vía categoria_manual)
 - **Exportar Excel** con formato APILADO (Alsina arriba, Tucumán abajo, para que el detalle no se superponga). Columnas: MLA | SKU | Descripción | Colores | Cantidad | Detalle. Nombre del archivo: "PEDIDO COTEMINAS - {Mes} {Año} - {Total/Parcial N}.xlsx"
-- **Confirmaciones**: pegar texto del email del proveedor
+- **Entregas (confirmaciones del proveedor)**: sección independiente en el menú. Se pega el email de facturación de Coteminas y la app lo PARSEA automáticamente (`parser_confirmacion.py`):
+  - Detecta depósito por el cliente facturado: SACCAL ALBERTO → Alsina, SACCAL SERGIO → Tucumán
+  - Extrae factura, remito, nro de pedido del proveedor, fecha emisión/vencimiento, valor total
+  - Lista de productos con cantidades; matchea cada uno al catálogo por `codigo`
+  - **Variantes nuevas**: si un código no matchea (color nuevo de un modelo existente), en el preview aparece un desplegable para asignar el SKU a mano (`entrega_items.sku_manual`). Así el cruce lo cuenta bien aunque el color no esté en el catálogo OI26.
+  - Campo **fecha de entrega** editable (la que Maru coordina con el proveedor)
+  - Tablas: `entregas` + `entrega_items` (independientes de los pedidos). Rutas: /entregas, /entregas/nueva, /entregas/guardar, /entregas/<id>, /entregas/<id>/editar, /entregas/<id>/eliminar
+  - Email de ejemplo en `data/email_ejemplo.txt`
+  - **Filtros** en la lista de entregas: por depósito y por período (mm/aaaa de la emisión)
+  - **Exportar Excel** de cada entrega (cabecera + productos): /entregas/<id>/exportar
+- **Comparativa Pedido vs Confirmado** (`/comparativa`, en el menú): cruza lo pedido (pedido_items) con lo confirmado (entrega_items), agrupado por SKU + depósito. Muestra pedido / confirmado / diferencia con badges (Falta X / Completo / Llegó de más). Cruce por SKU (sku_tu_textil), no por color. Filtro por depósito y opción "solo pedidos finalizados". Items sin SKU (colores fuera de catálogo) caen en fila "(sin SKU)".
+- **(viejo) Confirmaciones**: pegar texto del email del proveedor (tablas confirmaciones/confirmacion_items, reemplazadas por entregas)
 - **Historial**: todos los pedidos anteriores consultables
 - **Catálogo**: ver los 520 productos con filtros, SKU y MLA
+  - **Buscador**: busca por descripción, código, EAN, **SKU y MLA** (antes solo desc/código/EAN)
+  - **Editar a mano** (botón lápiz por fila → `/catalogo/<id>/editar`): corrige descripción, SKU, MLA, código, categoría, línea, diseño, color, EAN, etc. Es UPDATE (conserva el `id`), así que NO toca pedidos ni entregas (que apuntan por `producto_id`); el pedido muestra la info corregida.
+  - **Nuevo producto** (`/catalogo/nuevo`): alta manual de un producto que falte (queda `estado='activo'`, `fuente='manual'`). Campos obligatorios: código y descripción.
+  - **Duplicar** (botón "copiar" por fila → `/catalogo/<id>/duplicar`, GET): abre el form de alta precargado con TODOS los datos del producto original; al guardar postea a `/catalogo/nuevo` y crea un producto NUEVO (no toca el original). Ideal para cargar otra variante de color del mismo modelo cambiando solo código/color. El template `producto_form.html` usa `form_action` (destino del POST) y `duplicando` (aviso + título). Original queda intacto.
+  - **Discontinuar / reactivar** (`/catalogo/<id>/estado`, POST): soft delete vía `estado='discontinuado'`. Lo oculta del catálogo SIN borrar la fila, así los pedidos que lo referencian siguen intactos. Checkbox "Mostrar también discontinuados" para verlos y reactivarlos.
+  - Template del form: `templates/producto_form.html` (compartido nuevo/editar). Lógica en `_leer_form_producto()` + lista `CAMPOS_PRODUCTO` en app.py.
+  - **Edición masiva** (`/catalogo/editar-masivo`, POST): checkbox por fila + "seleccionar todos", botón "Editar seleccionados (N)" que abre un modal. Se tilda solo los campos a cambiar (`aplicar_<campo>`) y se aplica el MISMO valor a todos los seleccionados; lo no tildado queda como está en cada producto. Campos masivos: SKU, MLA, categoría, línea, diseño, origen, colección (`CAMPOS_MASIVOS`) + acción de estado (discontinuar/reactivar). Es UPDATE por `id IN (...)`, no toca pedidos. Los ids seleccionados se inyectan como inputs hidden vía JS al hacer submit (los checkboxes NO están dentro de un form para no anidar con los forms de discontinuar por fila). Ideal para asignar el mismo SKU/MLA a todas las variantes de color de un modelo.
 
 ## SKU Tu Textil + MLA MercadoLibre
 - `mapear_sku_mla.py` lee `PEDIDO COTEMINAS.xlsx` y asigna a cada producto del catálogo:

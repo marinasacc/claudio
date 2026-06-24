@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}Entregas{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="bi bi-truck"></i> Entregas del proveedor</h2>
+    <div class="d-flex gap-2">
+        <a href="/comparativa" class="btn btn-outline-info">
+            <i class="bi bi-bar-chart"></i> Pedido vs Confirmado
+        </a>
+        <a href="/entregas/nueva" class="btn btn-primary btn-lg">
+            <i class="bi bi-envelope-plus"></i> Cargar email
+        </a>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <form method="GET" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label mb-1 small">Depósito</label>
+                <select name="destino" class="form-select form-select-sm">
+                    <option value="">Todos</option>
+                    <option value="tucuman" {% if filtro_destino == 'tucuman' %}selected{% endif %}>Tucumán (Sergio)</option>
+                    <option value="alsina" {% if filtro_destino == 'alsina' %}selected{% endif %}>Alsina (Alberto)</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label mb-1 small">Período (emisión)</label>
+                <select name="periodo" class="form-select form-select-sm">
+                    <option value="">Todos</option>
+                    {% for p in periodos %}
+                        <option value="{{ p }}" {% if filtro_periodo == p %}selected{% endif %}>{{ p }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-funnel"></i> Filtrar</button>
+                {% if filtro_destino or filtro_periodo %}
+                    <a href="/entregas" class="btn btn-sm btn-outline-secondary">Limpiar</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if entregas %}
+<div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th>Depósito</th>
+                <th>Factura</th>
+                <th>Remito</th>
+                <th>Pedido prov.</th>
+                <th>Emisión</th>
+                <th class="text-center">Artículos</th>
+                <th class="text-center">Unidades</th>
+                <th>Fecha entrega</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for e in entregas %}
+            <tr>
+                <td>
+                    {% if e.destino == 'tucuman' %}
+                        <span class="badge badge-tucuman">Tucumán</span>
+                    {% elif e.destino == 'alsina' %}
+                        <span class="badge badge-alsina">Alsina</span>
+                    {% else %}
+                        <span class="badge bg-secondary">?</span>
+                    {% endif %}
+                </td>
+                <td class="fw-bold">{{ e.factura or '-' }}</td>
+                <td>{{ e.remito or '-' }}</td>
+                <td><small>{{ e.pedido_proveedor or '-' }}</small></td>
+                <td><small>{{ e.fecha_emision or '-' }}</small></td>
+                <td class="text-center">{{ e.n_items or 0 }}</td>
+                <td class="text-center fw-bold">{{ e.total_unidades or 0 }}</td>
+                <td>
+                    {% if e.fecha_entrega %}
+                        <span class="badge bg-success">{{ e.fecha_entrega | fecha_legible }}</span>
+                    {% else %}
+                        <span class="badge bg-warning text-dark">Sin fecha</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        <a href="/entregas/{{ e.id }}" class="btn btn-outline-primary" title="Ver">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                        <a href="/entregas/{{ e.id }}/exportar" class="btn btn-outline-success" title="Excel">
+                            <i class="bi bi-file-earmark-excel"></i>
+                        </a>
+                        <form method="POST" action="/entregas/{{ e.id }}/eliminar" class="d-inline"
+                              onsubmit="return confirm('¿Eliminar esta entrega (Factura {{ e.factura }})?')">
+                            <button type="submit" class="btn btn-outline-danger" title="Eliminar">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+    <i class="bi bi-truck display-1"></i>
+    <h4 class="mt-3">No hay entregas cargadas</h4>
+    <p>Cuando el proveedor te confirme una factura por email, pegala acá.</p>
+    <a href="/entregas/nueva" class="btn btn-primary btn-lg mt-2">
+        <i class="bi bi-envelope-plus"></i> Cargar email de confirmación
+    </a>
+</div>
+{% endif %}
+{% endblock %}

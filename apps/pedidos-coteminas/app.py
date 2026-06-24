@@ -9,12 +9,14 @@ Uso:
 import os
 import io
 import re
+import json
 from datetime import datetime
 from flask import (
     Flask, render_template, request, redirect, url_for,
     flash, jsonify, send_file
 )
 from models import get_db, init_db
+from parser_confirmacion import parse_email
 
 app = Flask(__name__)
 app.secret_key = 'pedidos-coteminas-tutextil-2026'
@@ -879,14 +881,20 @@ def catalogo():
     categoria = request.args.get('categoria', '')
     linea = request.args.get('linea', '')
     q = request.args.get('q', '')
+    incluir_inactivos = request.args.get('inactivos') == '1'
 
-    conditions = ["estado = 'activo'"]
+    conditions = []
     params = []
+    if not incluir_inactivos:
+        conditions.append("estado = 'activo'")
 
     if q:
-        conditions.append("(descripcion LIKE ? OR codigo LIKE ? OR ean LIKE ?)")
+        conditions.append(
+            "(descripcion LIKE ? OR codigo LIKE ? OR ean LIKE ? "
+            "OR sku_tu_textil LIKE ? OR mla_ids LIKE ?)"
+        )
         like = f"%{q}%"
-        params.extend([like, like, like])
+        params.extend([like, like, like, like, like])
     if categoria:
         conditions.append("categoria = ?")
         params.append(categoria)
@@ -894,9 +902,9 @@ def catalogo():
         conditions.append("linea = ?")
         params.append(linea)
 
-    where = " AND ".join(conditions)
+    where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
     productos = conn.execute(f"""
-        SELECT * FROM productos WHERE {where}
+        SELECT * FROM productos {where}
         ORDER BY categoria, linea, descripcion
         LIMIT 500
     """, params).fetchall()
@@ -917,6 +925,583 @@ def catalogo():
                            filtro_categoria=categoria,
                            filtro_linea=linea,
                            filtro_q=q,
+                           incluir_inactivos=incluir_inactivos,
+                           categorias_display=CATEGORIAS_DISPLAY)
+
+
+# Campos del catálogo que se pueden editar a mano desde la web
+CAMPOS_PRODUCTO = [
+    'codigo', 'descripcion', 'sku_tu_textil', 'mla_ids', 'categoria',
+    'linea', 'diseno', 'color_nombre', 'color_codigo', 'tipo',
+    'tamanio', 'ean', 'origen', 'coleccion',
+]
+
+
+def _leer_form_producto():
+    """Lee los campos del producto desde request.form, normalizando vacíos a None."""
+    datos = {}
+    for campo in CAMPOS_PRODUCTO:
+        val = (request.form.get(campo) or '').strip()
+        datos[campo] = val or None
+    # Normalizar MLA: quitar espacios y dejar separados por coma
+    if datos.get('mla_ids'):
+        partes = re.split(r'[\s,]+', datos['mla_ids'])
+        datos['mla_ids'] = ','.join(p for p in partes if p)
+    return datos
+
+
+@app.route('/catalogo/nuevo', methods=['GET', 'POST'])
+def producto_nuevo():
+    """Crear un producto manualmente (por si falta algo del catálogo)."""
+    if request.method == 'POST':
+        datos = _leer_form_producto()
+        if not datos.get('descripcion') or not datos.get('codigo'):
+            flash('El código y la descripción son obligatorios.', 'warning')
+            return render_template('producto_form.html', producto=datos, es_nuevo=True,
+                                   categorias_display=CATEGORIAS_DISPLAY,
+                                   categorias_orden=CATEGORIAS_ORDEN)
+        conn = get_db()
+        columnas = CAMPOS_PRODUCTO + ['estado', 'fuente']
+        valores = [datos[c] for c in CAMPOS_PRODUCTO] + ['activo', 'manual']
+        placeholders = ','.join('?' for _ in columnas)
+        conn.execute(
+            f"INSERT INTO productos ({','.join(columnas)}) VALUES ({placeholders})",
+            valores
+        )
+        conn.commit()
+        conn.close()
+        flash(f"Producto «{datos['descripcion']}» creado.", 'success')
+        return redirect(url_for('catalogo', q=datos.get('sku_tu_textil') or datos['codigo']))
+
+    return render_template('producto_form.html', producto={}, es_nuevo=True,
+                           categorias_display=CATEGORIAS_DISPLAY,
+                           categorias_orden=CATEGORIAS_ORDEN)
+
+
+@app.route('/catalogo/<int:producto_id>/duplicar', methods=['GET'])
+def producto_duplicar(producto_id):
+    """Abre el formulario de alta precargado con los datos de un producto existente.
+    Al guardar crea un producto NUEVO (postea a /catalogo/nuevo), no modifica el original."""
+    conn = get_db()
+    producto = conn.execute("SELECT * FROM productos WHERE id = ?", (producto_id,)).fetchone()
+    conn.close()
+    if not producto:
+        flash('No se encontró ese producto.', 'warning')
+        return redirect(url_for('catalogo'))
+    datos = {c: producto[c] for c in CAMPOS_PRODUCTO}
+    return render_template('producto_form.html', producto=datos, es_nuevo=True,
+                           duplicando=True, form_action=url_for('producto_nuevo'),
+                           categorias_display=CATEGORIAS_DISPLAY,
+                           categorias_orden=CATEGORIAS_ORDEN)
+
+
+@app.route('/catalogo/<int:producto_id>/editar', methods=['GET', 'POST'])
+def producto_editar(producto_id):
+    """Editar un producto del catálogo. UPDATE conserva el id, así que NO toca
+    los pedidos ni entregas guardados (que apuntan a este producto por su id)."""
+    conn = get_db()
+    producto = conn.execute("SELECT * FROM productos WHERE id = ?", (producto_id,)).fetchone()
+    if not producto:
+        conn.close()
+        flash('No se encontró ese producto.', 'warning')
+        return redirect(url_for('catalogo'))
+
+    if request.method == 'POST':
+        datos = _leer_form_producto()
+        if not datos.get('descripcion') or not datos.get('codigo'):
+            conn.close()
+            flash('El código y la descripción son obligatorios.', 'warning')
+            return render_template('producto_form.html', producto={**dict(producto), **datos},
+                                   es_nuevo=False, categorias_display=CATEGORIAS_DISPLAY,
+                                   categorias_orden=CATEGORIAS_ORDEN)
+        set_clause = ', '.join(f"{c} = ?" for c in CAMPOS_PRODUCTO)
+        valores = [datos[c] for c in CAMPOS_PRODUCTO] + [producto_id]
+        conn.execute(f"UPDATE productos SET {set_clause} WHERE id = ?", valores)
+        conn.commit()
+        conn.close()
+        flash(f"Producto «{datos['descripcion']}» actualizado.", 'success')
+        return redirect(url_for('catalogo', q=datos.get('sku_tu_textil') or datos['codigo']))
+
+    conn.close()
+    return render_template('producto_form.html', producto=dict(producto), es_nuevo=False,
+                           categorias_display=CATEGORIAS_DISPLAY,
+                           categorias_orden=CATEGORIAS_ORDEN)
+
+
+@app.route('/catalogo/<int:producto_id>/estado', methods=['POST'])
+def producto_estado(producto_id):
+    """Discontinuar o reactivar un producto (soft delete). No borra la fila,
+    así los pedidos que lo referencian siguen funcionando."""
+    nuevo = 'discontinuado' if request.form.get('accion') == 'discontinuar' else 'activo'
+    conn = get_db()
+    conn.execute("UPDATE productos SET estado = ? WHERE id = ?", (nuevo, producto_id))
+    conn.commit()
+    conn.close()
+    if nuevo == 'discontinuado':
+        flash('Producto discontinuado (oculto del catálogo, pero los pedidos siguen intactos).', 'info')
+    else:
+        flash('Producto reactivado.', 'success')
+    return redirect(request.referrer or url_for('catalogo'))
+
+
+# Campos que se pueden aplicar masivamente (los que tiene sentido compartir entre varios)
+CAMPOS_MASIVOS = ['sku_tu_textil', 'mla_ids', 'categoria', 'linea', 'diseno', 'origen', 'coleccion']
+
+
+@app.route('/catalogo/editar-masivo', methods=['POST'])
+def producto_editar_masivo():
+    """Aplica la misma info a varios productos a la vez. Solo cambia los campos
+    que se marcaron con 'aplicar_<campo>'. Es UPDATE: no toca pedidos ni entregas."""
+    ids = [int(i) for i in request.form.getlist('ids') if i.strip().isdigit()]
+    if not ids:
+        flash('No seleccionaste ningún producto.', 'warning')
+        return redirect(request.referrer or url_for('catalogo'))
+
+    sets, valores = [], []
+    for campo in CAMPOS_MASIVOS:
+        if request.form.get(f'aplicar_{campo}'):
+            val = (request.form.get(campo) or '').strip()
+            if campo == 'mla_ids' and val:
+                partes = re.split(r'[\s,]+', val)
+                val = ','.join(p for p in partes if p)
+            sets.append(f"{campo} = ?")
+            valores.append(val or None)
+
+    estado_accion = request.form.get('estado_accion')
+    if estado_accion == 'discontinuar':
+        sets.append("estado = 'discontinuado'")
+    elif estado_accion == 'reactivar':
+        sets.append("estado = 'activo'")
+
+    if not sets:
+        flash('No marcaste ningún campo para cambiar.', 'warning')
+        return redirect(request.referrer or url_for('catalogo'))
+
+    placeholders = ','.join('?' for _ in ids)
+    conn = get_db()
+    conn.execute(
+        f"UPDATE productos SET {', '.join(sets)} WHERE id IN ({placeholders})",
+        valores + ids
+    )
+    conn.commit()
+    conn.close()
+    flash(f'{len(ids)} producto(s) actualizados a la vez.', 'success')
+    return redirect(request.referrer or url_for('catalogo'))
+
+
+# ── ENTREGAS (confirmaciones del proveedor) ──────────────────────────
+
+def _skus_disponibles():
+    """Lista de SKUs existentes con un nombre de modelo legible, para asignar a mano."""
+    conn = get_db()
+    rows = conn.execute("""
+        SELECT sku_tu_textil, categoria, MIN(descripcion) as desc, COUNT(*) as variantes
+        FROM productos
+        WHERE sku_tu_textil IS NOT NULL
+        GROUP BY sku_tu_textil
+        ORDER BY categoria, sku_tu_textil
+    """).fetchall()
+    conn.close()
+    skus = []
+    for r in rows:
+        # Nombre de modelo: descripción sin el color/código final
+        nombre = r['desc'] or ''
+        nombre = re.sub(r'\s+\d{4}\s*$', '', nombre).strip()  # quitar código de color
+        nombre = re.sub(r'\s+\S+$', '', nombre).strip() if nombre else nombre  # quitar última palabra (color)
+        cat = CATEGORIAS_DISPLAY.get(r['categoria'], r['categoria'] or '')
+        skus.append({
+            'sku': r['sku_tu_textil'],
+            'nombre': nombre.title() if nombre else r['sku_tu_textil'],
+            'categoria': cat,
+            'label': f"{r['sku_tu_textil']} — {nombre.title()} ({cat})",
+        })
+    return skus
+
+
+def _match_items_catalogo(items):
+    """Para cada item parseado, busca el producto en el catálogo por código.
+    Agrega producto_id, sku y nombre_catalogo (None si no matchea)."""
+    conn = get_db()
+    for it in items:
+        prod = conn.execute(
+            "SELECT id, descripcion, sku_tu_textil, categoria FROM productos WHERE codigo = ?",
+            (it['codigo'],)
+        ).fetchone()
+        if prod:
+            it['producto_id'] = prod['id']
+            it['sku'] = prod['sku_tu_textil']
+            it['categoria'] = prod['categoria']
+            it['en_catalogo'] = True
+        else:
+            it['producto_id'] = None
+            it['sku'] = None
+            it['categoria'] = None
+            it['en_catalogo'] = False
+    conn.close()
+    return items
+
+
+@app.route('/entregas')
+def entregas():
+    """Lista de entregas/confirmaciones del proveedor, con filtros."""
+    destino = request.args.get('destino', '').strip()
+    periodo = request.args.get('periodo', '').strip()  # formato MM/AAAA sobre fecha_emision
+
+    conn = get_db()
+    conds = []
+    params = []
+    if destino:
+        conds.append("e.destino = ?")
+        params.append(destino)
+    if periodo:
+        # fecha_emision viene como dd/mm/aaaa → comparar el mm/aaaa final
+        conds.append("substr(e.fecha_emision, 4) = ?")
+        params.append(periodo)
+    where = ("WHERE " + " AND ".join(conds)) if conds else ""
+
+    filas = conn.execute(f"""
+        SELECT e.*,
+            (SELECT COUNT(*) FROM entrega_items WHERE entrega_id = e.id) as n_items,
+            (SELECT SUM(cantidad) FROM entrega_items WHERE entrega_id = e.id) as total_unidades
+        FROM entregas e
+        {where}
+        ORDER BY e.fecha_emision DESC, e.created_at DESC
+    """, params).fetchall()
+
+    # Períodos disponibles para el filtro (mm/aaaa distintos)
+    periodos = conn.execute("""
+        SELECT DISTINCT substr(fecha_emision, 4) as periodo FROM entregas
+        WHERE fecha_emision IS NOT NULL AND fecha_emision != ''
+        ORDER BY substr(fecha_emision, 7) DESC, substr(fecha_emision, 4, 2) DESC
+    """).fetchall()
+    conn.close()
+    return render_template('entregas.html', entregas=filas,
+                           filtro_destino=destino, filtro_periodo=periodo,
+                           periodos=[p['periodo'] for p in periodos])
+
+
+@app.route('/entregas/nueva', methods=['GET', 'POST'])
+def nueva_entrega():
+    """Pegar el email del proveedor y previsualizar lo parseado."""
+    if request.method == 'POST':
+        texto = request.form.get('texto_email', '').strip()
+        if not texto:
+            flash('Pegá el texto del email de confirmación', 'warning')
+            return render_template('nueva_entrega.html', preview=None)
+
+        datos = parse_email(texto)
+        datos['items'] = _match_items_catalogo(datos['items'])
+        datos['texto_email'] = texto
+        # Total de unidades
+        datos['total_unidades'] = sum(it['cantidad'] or 0 for it in datos['items'])
+        datos['n_en_catalogo'] = sum(1 for it in datos['items'] if it['en_catalogo'])
+
+        return render_template('nueva_entrega.html',
+                               preview=datos,
+                               items_json=json.dumps(datos['items']),
+                               skus_disponibles=_skus_disponibles(),
+                               meses=MESES)
+
+    return render_template('nueva_entrega.html', preview=None)
+
+
+@app.route('/entregas/guardar', methods=['POST'])
+def guardar_entrega():
+    """Guardar la entrega parseada (viene del preview)."""
+    items = json.loads(request.form.get('items_json', '[]'))
+    destino = request.form.get('destino', '').strip() or None
+    fecha_entrega = request.form.get('fecha_entrega', '').strip() or None
+    notas = request.form.get('notas', '').strip()
+
+    conn = get_db()
+    cursor = conn.execute("""
+        INSERT INTO entregas (destino, cliente, factura, remito, pedido_proveedor,
+                              fecha_emision, fecha_vencimiento, fecha_entrega,
+                              valor_total, texto_email, notas)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        destino,
+        request.form.get('cliente', '').strip() or None,
+        request.form.get('factura', '').strip() or None,
+        request.form.get('remito', '').strip() or None,
+        request.form.get('pedido_proveedor', '').strip() or None,
+        request.form.get('fecha_emision', '').strip() or None,
+        request.form.get('fecha_vencimiento', '').strip() or None,
+        fecha_entrega,
+        float(request.form['valor_total']) if request.form.get('valor_total') else None,
+        request.form.get('texto_email', '').strip() or None,
+        notas,
+    ))
+    entrega_id = cursor.lastrowid
+
+    for idx, it in enumerate(items):
+        # SKU asignado a mano para items que no matchearon el catálogo
+        sku_manual = request.form.get(f'sku_item_{idx}', '').strip() or None
+        conn.execute("""
+            INSERT INTO entrega_items (entrega_id, producto_id, codigo_item, sku_manual, descripcion,
+                                       cantidad, valor_unit, valor_total)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            entrega_id, it.get('producto_id'), it.get('codigo'), sku_manual, it.get('descripcion'),
+            it.get('cantidad'), it.get('valor_unit'), it.get('valor_total'),
+        ))
+
+    conn.commit()
+    conn.close()
+    flash('Entrega guardada', 'success')
+    return redirect(url_for('ver_entrega', entrega_id=entrega_id))
+
+
+@app.route('/entregas/<int:entrega_id>')
+def ver_entrega(entrega_id):
+    """Detalle de una entrega."""
+    conn = get_db()
+    entrega = conn.execute("SELECT * FROM entregas WHERE id = ?", (entrega_id,)).fetchone()
+    if not entrega:
+        flash('Entrega no encontrada', 'error')
+        return redirect(url_for('entregas'))
+
+    items = conn.execute("""
+        SELECT ei.*,
+               COALESCE(p.sku_tu_textil, ei.sku_manual) as prod_sku,
+               COALESCE(p.categoria, p3.categoria) as prod_categoria
+        FROM entrega_items ei
+        LEFT JOIN productos p ON ei.producto_id = p.id
+        LEFT JOIN productos p3 ON p3.sku_tu_textil = ei.sku_manual
+        WHERE ei.entrega_id = ?
+        ORDER BY prod_categoria, ei.descripcion
+    """, (entrega_id,)).fetchall()
+    total = sum(i['cantidad'] or 0 for i in items)
+    conn.close()
+    return render_template('ver_entrega.html', entrega=entrega, items=items,
+                           total_unidades=total, categorias_display=CATEGORIAS_DISPLAY)
+
+
+@app.route('/entregas/<int:entrega_id>/exportar')
+def exportar_entrega(entrega_id):
+    """Exportar una entrega a Excel (cabecera + productos)."""
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+
+    conn = get_db()
+    entrega = conn.execute("SELECT * FROM entregas WHERE id = ?", (entrega_id,)).fetchone()
+    if not entrega:
+        flash('Entrega no encontrada', 'error')
+        return redirect(url_for('entregas'))
+    items = conn.execute("""
+        SELECT ei.*, p.sku_tu_textil as prod_sku
+        FROM entrega_items ei
+        LEFT JOIN productos p ON ei.producto_id = p.id
+        WHERE ei.entrega_id = ?
+        ORDER BY ei.descripcion
+    """, (entrega_id,)).fetchall()
+    conn.close()
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = f"Entrega {entrega['factura'] or entrega_id}"[:31]
+    thin = Border(*(Side(style='thin'),) * 4)
+
+    dep = 'TUCUMÁN - SERGIO' if entrega['destino'] == 'tucuman' else 'ALSINA - ALBERTO'
+    color = '548235' if entrega['destino'] == 'tucuman' else '2F5496'
+
+    ws.merge_cells('A1:F1')
+    ws['A1'] = f"ENTREGA COTEMINAS — {dep}"
+    ws['A1'].font = Font(bold=True, size=14, color='FFFFFF')
+    ws['A1'].fill = PatternFill(start_color=color, end_color=color, fill_type='solid')
+    ws['A1'].alignment = Alignment(horizontal='center')
+
+    fent = fecha_legible_filter(entrega['fecha_entrega'])
+    info = [
+        ('Cliente', entrega['cliente'] or '-'),
+        ('Factura', entrega['factura'] or '-'),
+        ('Remito', entrega['remito'] or '-'),
+        ('Pedido proveedor', entrega['pedido_proveedor'] or '-'),
+        ('Emisión', entrega['fecha_emision'] or '-'),
+        ('Fecha de entrega', fent or 'sin definir'),
+    ]
+    r = 2
+    for k, v in info:
+        ws.cell(row=r, column=1, value=k).font = Font(bold=True)
+        ws.cell(row=r, column=2, value=v)
+        r += 1
+
+    r += 1
+    headers = ['Código', 'SKU', 'Descripción', 'Cantidad', 'Valor unit.', 'Valor total']
+    for i, h in enumerate(headers):
+        c = ws.cell(row=r, column=i + 1, value=h)
+        c.font = Font(bold=True)
+        c.fill = PatternFill(start_color='D9E1F2', end_color='D9E1F2', fill_type='solid')
+        c.border = thin
+    r += 1
+    total_u = 0
+    for it in items:
+        ws.cell(row=r, column=1, value=it['codigo_item'])
+        ws.cell(row=r, column=2, value=it['prod_sku'] or '')
+        ws.cell(row=r, column=3, value=it['descripcion'])
+        ws.cell(row=r, column=4, value=it['cantidad'])
+        ws.cell(row=r, column=5, value=it['valor_unit'])
+        ws.cell(row=r, column=6, value=it['valor_total'])
+        for col in range(1, 7):
+            ws.cell(row=r, column=col).border = thin
+        total_u += it['cantidad'] or 0
+        r += 1
+    ws.cell(row=r, column=3, value='TOTAL UNIDADES:').font = Font(bold=True)
+    ws.cell(row=r, column=4, value=total_u).font = Font(bold=True, size=12)
+
+    ws.column_dimensions['A'].width = 20
+    ws.column_dimensions['B'].width = 12
+    ws.column_dimensions['C'].width = 45
+    ws.column_dimensions['D'].width = 10
+    ws.column_dimensions['E'].width = 14
+    ws.column_dimensions['F'].width = 16
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    nombre_dep = 'Tucuman' if entrega['destino'] == 'tucuman' else 'Alsina'
+    filename = f"Entrega Coteminas - {nombre_dep} - Factura {entrega['factura'] or entrega_id}.xlsx"
+    return send_file(buffer, as_attachment=True, download_name=filename,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+@app.route('/entregas/<int:entrega_id>/editar', methods=['POST'])
+def editar_entrega(entrega_id):
+    """Editar fecha de entrega, destino y notas de una entrega."""
+    conn = get_db()
+    conn.execute("""
+        UPDATE entregas SET fecha_entrega = ?, destino = ?, notas = ?
+        WHERE id = ?
+    """, (
+        request.form.get('fecha_entrega', '').strip() or None,
+        request.form.get('destino', '').strip() or None,
+        request.form.get('notas', '').strip(),
+        entrega_id,
+    ))
+    conn.commit()
+    conn.close()
+    flash('Entrega actualizada', 'success')
+    return redirect(url_for('ver_entrega', entrega_id=entrega_id))
+
+
+@app.route('/entregas/<int:entrega_id>/eliminar', methods=['POST'])
+def eliminar_entrega(entrega_id):
+    """Eliminar una entrega."""
+    conn = get_db()
+    conn.execute("DELETE FROM entrega_items WHERE entrega_id = ?", (entrega_id,))
+    conn.execute("DELETE FROM entregas WHERE id = ?", (entrega_id,))
+    conn.commit()
+    conn.close()
+    flash('Entrega eliminada', 'info')
+    return redirect(url_for('entregas'))
+
+
+# ── COMPARATIVA: pedido vs confirmado ────────────────────────────────
+
+@app.route('/comparativa')
+def comparativa():
+    """Cruza lo PEDIDO (de los pedidos) con lo CONFIRMADO (de las entregas),
+    agrupado por SKU y depósito. Muestra cuánto pediste vs cuánto te llega y la diferencia."""
+    destino_filtro = request.args.get('destino', '').strip()
+    solo_finalizados = request.args.get('finalizados', '') == '1'
+
+    conn = get_db()
+
+    # ── PEDIDO: sumar pedido_items por SKU + destino ──
+    cond_ped = []
+    if destino_filtro:
+        cond_ped.append("pi.destino = ?")
+    if solo_finalizados:
+        cond_ped.append("pe.estado = 'finalizado'")
+    where_ped = ("WHERE " + " AND ".join(cond_ped)) if cond_ped else ""
+    params_ped = [destino_filtro] if destino_filtro else []
+
+    pedido_rows = conn.execute(f"""
+        SELECT pi.destino,
+               COALESCE(p.sku_tu_textil, pi.codigo_manual) as sku,
+               COALESCE(p.categoria, pi.categoria_manual) as categoria,
+               SUM(pi.cantidad) as cantidad
+        FROM pedido_items pi
+        JOIN pedidos pe ON pi.pedido_id = pe.id
+        LEFT JOIN productos p ON pi.producto_id = p.id
+        {where_ped}
+        GROUP BY pi.destino, sku
+    """, params_ped).fetchall()
+
+    # ── CONFIRMADO: sumar entrega_items por SKU + destino ──
+    cond_ent = []
+    if destino_filtro:
+        cond_ent.append("e.destino = ?")
+    where_ent = ("WHERE " + " AND ".join(cond_ent)) if cond_ent else ""
+    params_ent = [destino_filtro] if destino_filtro else []
+
+    # Nota: NO unir por sku_manual (sku_tu_textil no es único → multiplicaría filas).
+    # La categoría se resuelve después con sku_nombre.
+    entrega_rows = conn.execute(f"""
+        SELECT e.destino,
+               COALESCE(p.sku_tu_textil, ei.sku_manual, p2.sku_tu_textil) as sku,
+               COALESCE(p.categoria, p2.categoria) as categoria,
+               SUM(ei.cantidad) as cantidad
+        FROM entrega_items ei
+        JOIN entregas e ON ei.entrega_id = e.id
+        LEFT JOIN productos p ON ei.producto_id = p.id
+        LEFT JOIN productos p2 ON p2.codigo = ei.codigo_item
+        {where_ent}
+        GROUP BY e.destino, sku
+    """, params_ent).fetchall()
+
+    # Nombre legible por SKU (descripción base de la familia)
+    sku_nombre = {}
+    for r in conn.execute("""
+        SELECT sku_tu_textil, MIN(descripcion) as desc, categoria
+        FROM productos WHERE sku_tu_textil IS NOT NULL GROUP BY sku_tu_textil
+    """).fetchall():
+        sku_nombre[r['sku_tu_textil']] = (r['desc'], r['categoria'])
+    conn.close()
+
+    # ── Combinar por (destino, sku) ──
+    comb = {}  # (destino, sku) -> {pedido, confirmado, categoria}
+    for r in pedido_rows:
+        key = (r['destino'], r['sku'] or '(sin SKU)')
+        comb.setdefault(key, {'pedido': 0, 'confirmado': 0, 'categoria': r['categoria']})
+        comb[key]['pedido'] += r['cantidad'] or 0
+    for r in entrega_rows:
+        key = (r['destino'], r['sku'] or '(sin SKU)')
+        comb.setdefault(key, {'pedido': 0, 'confirmado': 0, 'categoria': r['categoria']})
+        comb[key]['confirmado'] += r['cantidad'] or 0
+        if not comb[key]['categoria']:
+            comb[key]['categoria'] = r['categoria']
+
+    # Armar filas por destino
+    resultado = {'tucuman': [], 'alsina': []}
+    for (destino, sku), v in comb.items():
+        if destino not in resultado:
+            continue
+        nombre, cat = sku_nombre.get(sku, (None, v['categoria']))
+        # nombre legible: usar descripción del catálogo recortada, o el SKU
+        if nombre:
+            # sacar el color final para mostrar el modelo
+            nombre_modelo = re.sub(r'\s+\d{4}\s*$', '', nombre).strip()
+        else:
+            nombre_modelo = sku
+        resultado[destino].append({
+            'sku': sku,
+            'nombre': nombre_modelo,
+            'categoria': cat or 'otro',
+            'pedido': v['pedido'],
+            'confirmado': v['confirmado'],
+            'diferencia': v['pedido'] - v['confirmado'],
+        })
+
+    # Ordenar cada destino por categoría y nombre
+    orden_cat = {c: i for i, c in enumerate(CATEGORIAS_ORDEN)}
+    for d in resultado:
+        resultado[d].sort(key=lambda x: (orden_cat.get(x['categoria'], 99), x['nombre'] or ''))
+
+    return render_template('comparativa.html',
+                           resultado=resultado,
+                           filtro_destino=destino_filtro,
+                           solo_finalizados=solo_finalizados,
                            categorias_display=CATEGORIAS_DISPLAY)
 
 
