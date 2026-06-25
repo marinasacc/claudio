@@ -4,7 +4,7 @@ Gestión de pedidos mensuales para el proveedor Coteminas.
 
 Uso:
     python app.py
-    Abrir http://localhost:5050 en el navegador
+    Abrir http://localhost:5051 en el navegador
 """
 import os
 import io
@@ -1509,6 +1509,6 @@ if __name__ == '__main__':
     init_db()
     print("\n" + "=" * 50)
     print("  PEDIDOS COTEMINAS - Tu Textil")
-    print("  Abrir: http://localhost:5050")
+    print("  Abrir: http://localhost:5051")
     print("=" * 50 + "\n")
-    app.run(debug=True, port=5050, use_reloader=False)
+    app.run(debug=True, port=5051, use_reloader=False)

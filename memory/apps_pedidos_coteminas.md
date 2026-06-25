@@ -3,11 +3,11 @@
 ## Ubicación
 - Carpeta: `apps/pedidos-coteminas/`
 - Iniciar: doble clic en `iniciar.bat` o `python -X utf8 app.py`
-- URL: http://localhost:5050
+- URL: http://localhost:5051
 
 ## Stack
 - Flask local + SQLite + Bootstrap 5
-- Puerto 5050
+- Puerto 5051 (se cambió de 5050 a 5051 porque chocaba con la app Cuentas Corrientes, que usa 5050)
 
 ## Base de datos
 - `data/pedidos.db` (SQLite)
@@ -62,7 +62,7 @@
 - Reglas de mapeo (SKU -> query SQL) están en `build_mapping_rules()` dentro de mapear_sku_mla.py
 
 ## Notas técnicas
-- Puerto 5050, `use_reloader=False` (evita doble proceso y locks de SQLite)
+- Puerto 5051, `use_reloader=False` (evita doble proceso y locks de SQLite)
 - `get_db()` usa timeout=15 y busy_timeout para evitar "database is locked"
 - Extracción de diseño/color: lógica posicional [CATEGORIA][LINEA][DISEÑO][COLOR][CODIGO 4 díg]
 - Si se reimportan productos (importar_productos.py), HAY QUE re-correr mapear_sku_mla.py después
